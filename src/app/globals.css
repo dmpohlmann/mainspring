@@ -7,8 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -45,6 +45,13 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Brand colour tokens */
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-gold-light: var(--brand-gold-light);
+  --color-brand-navy-light: var(--brand-navy-light);
+  --color-brand-gold-dark: var(--brand-gold-dark);
 }
 
 :root {
@@ -54,10 +61,10 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
+  --primary: #1B3A5C;
+  --primary-foreground: #ffffff;
+  --secondary: #C9964C;
+  --secondary-foreground: #1B3A5C;
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
   --accent: oklch(0.97 0 0);
@@ -65,21 +72,30 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: #1B3A5C;
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  /* Sidebar — brand navy */
+  --sidebar: #1B3A5C;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #C9964C;
+  --sidebar-primary-foreground: #1B3A5C;
+  --sidebar-accent: #234873;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #234873;
+  --sidebar-ring: #C9964C;
+
+  /* Brand tokens */
+  --brand-navy: #1B3A5C;
+  --brand-gold: #C9964C;
+  --brand-gold-light: #D4AA6A;
+  --brand-navy-light: #C8D4E2;
+  --brand-gold-dark: #D4AA6A;
 }
 
 .dark {
@@ -89,10 +105,10 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
+  --primary: #C8D4E2;
+  --primary-foreground: #1B3A5C;
+  --secondary: #D4AA6A;
+  --secondary-foreground: #1B3A5C;
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
@@ -100,20 +116,29 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: #C8D4E2;
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
+
+  /* Sidebar — dark variant */
+  --sidebar: oklch(0.17 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-primary: #D4AA6A;
+  --sidebar-primary-foreground: oklch(0.145 0 0);
+  --sidebar-accent: oklch(0.22 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: #D4AA6A;
+
+  /* Brand tokens — dark variants */
+  --brand-navy: #C8D4E2;
+  --brand-gold: #D4AA6A;
+  --brand-gold-light: #D4AA6A;
+  --brand-navy-light: #C8D4E2;
+  --brand-gold-dark: #D4AA6A;
 }
 
 @layer base {
