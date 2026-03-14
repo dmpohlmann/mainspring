@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(which vercel:*)",
+      "Bash(npm list:*)",
+      "Bash(npm ls:*)",
+      "Bash(echo:*)",
+      "Bash(vercel:*)",
+      "Bash(command:*)",
+      "Bash(printf:*)",
+      "Bash(echo test:*)",
+      "Bash(npm i:*)",
+      "Bash(npx:*)",
+      "Bash(rm:*)",
+      "Bash(cp:*)",
+      "Bash(cd:*)"
+    ]
+  }
+}
