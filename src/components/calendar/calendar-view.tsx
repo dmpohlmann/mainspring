@@ -19,7 +19,7 @@ const entryTypeColors: Record<string, string> = {
   annual_leave: "bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-800 dark:text-blue-300",
   personal_leave: "bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 text-orange-800 dark:text-orange-300",
   public_holiday: "bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-800 dark:text-green-300",
-  flex_day: "bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-800 dark:text-purple-300",
+  toil_day: "bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-800 dark:text-purple-300",
   other: "bg-gray-100 hover:bg-gray-200 dark:bg-gray-800/30 dark:hover:bg-gray-800/50 text-gray-800 dark:text-gray-300",
 };
 
