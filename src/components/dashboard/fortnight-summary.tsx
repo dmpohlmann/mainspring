@@ -24,6 +24,42 @@ export function FortnightSummary({ entries, start, end }: FortnightSummaryProps)
   const today = new Date().toISOString().split("T")[0];
 
   const weekdayDates = allDates.filter((d) => !isWeekend(d));
+  const week1 = weekdayDates.slice(0, 5);
+  const week2 = weekdayDates.slice(5);
+
+  function renderDay(date: string) {
+    const entry = entryMap.get(date);
+    const isFuture = date > today;
+    const isMissing = !entry && !isFuture;
+
+    return (
+      <div
+        key={date}
+        className={cn(
+          "flex items-center justify-between rounded px-1.5 py-0.5 text-xs",
+          isMissing && "bg-amber-50 dark:bg-amber-950/30"
+        )}
+      >
+        <span className={cn("w-16", isMissing && "text-amber-700 dark:text-amber-400")}>
+          {getDayName(date)} {date.slice(8)}
+        </span>
+        {entry ? (
+          <span
+            className={cn(
+              "font-medium",
+              entry.flex_minutes > 0 && "text-green-600 dark:text-green-400",
+              entry.flex_minutes < 0 && "text-red-600 dark:text-red-400",
+              entry.flex_minutes === 0 && "text-muted-foreground"
+            )}
+          >
+            {formatFlexMinutes(entry.flex_minutes)}
+          </span>
+        ) : isMissing ? (
+          <span className="text-amber-700 dark:text-amber-400">—</span>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <Card>
@@ -37,40 +73,15 @@ export function FortnightSummary({ entries, start, end }: FortnightSummaryProps)
         <p className="text-xs text-muted-foreground mb-3">
           {formatDateAU(start)} – {formatDateAU(end)}
         </p>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-          {weekdayDates.map((date) => {
-            const entry = entryMap.get(date);
-            const isFuture = date > today;
-            const isMissing = !entry && !isFuture;
-
-            return (
-              <div
-                key={date}
-                className={cn(
-                  "flex items-center justify-between rounded px-1.5 py-0.5 text-xs",
-                  isMissing && "bg-amber-50 dark:bg-amber-950/30"
-                )}
-              >
-                <span className={cn("w-16", isMissing && "text-amber-700 dark:text-amber-400")}>
-                  {getDayName(date)} {date.slice(8)}
-                </span>
-                {entry ? (
-                  <span
-                    className={cn(
-                      "font-medium",
-                      entry.flex_minutes > 0 && "text-green-600 dark:text-green-400",
-                      entry.flex_minutes < 0 && "text-red-600 dark:text-red-400",
-                      entry.flex_minutes === 0 && "text-muted-foreground"
-                    )}
-                  >
-                    {formatFlexMinutes(entry.flex_minutes)}
-                  </span>
-                ) : isMissing ? (
-                  <span className="text-amber-700 dark:text-amber-400">—</span>
-                ) : null}
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-2 gap-x-4">
+          <div>
+            <h4 className="text-xs font-medium text-muted-foreground mb-1">Week 1</h4>
+            <div className="space-y-0.5">{week1.map(renderDay)}</div>
+          </div>
+          <div>
+            <h4 className="text-xs font-medium text-muted-foreground mb-1">Week 2</h4>
+            <div className="space-y-0.5">{week2.map(renderDay)}</div>
+          </div>
         </div>
         <div className="mt-3 flex items-center justify-between border-t pt-2 text-sm">
           <span className="font-medium">{formatWorkedMinutes(totalWorked)}</span>

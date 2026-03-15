@@ -26,7 +26,9 @@
       "WebFetch(domain:mainspringapp.vercel.app)",
       "WebFetch(domain:mainspring-five.vercel.app)",
       "Bash(dir:*)",
-      "Bash(cmd /c echo testing)"
+      "Bash(cmd /c echo testing)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "Bash(find:*)"
     ]
   }
 }
