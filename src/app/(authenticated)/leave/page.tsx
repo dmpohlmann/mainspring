@@ -1,13 +1,13 @@
-import { getLeaveBalances, getFlexBalance } from "@/lib/queries/dashboard";
+import { getLeaveBalances, getToilBalance } from "@/lib/queries/dashboard";
 import { createClient } from "@/lib/supabase/server";
 import { LeavePageClient } from "@/components/leave/leave-page-client";
 
 export default async function LeavePage() {
   const supabase = await createClient();
 
-  const [leaveBalances, flexBalance, transactionsResult] = await Promise.all([
+  const [leaveBalances, toilBalance, transactionsResult] = await Promise.all([
     getLeaveBalances(),
-    getFlexBalance(),
+    getToilBalance(),
     supabase
       .from("leave_transactions")
       .select("*")
@@ -20,7 +20,7 @@ export default async function LeavePage() {
       <h2 className="text-2xl font-bold">Leave Management</h2>
       <LeavePageClient
         leaveBalances={leaveBalances}
-        flexBalance={flexBalance}
+        toilBalance={toilBalance}
         transactions={transactionsResult.data || []}
       />
     </div>

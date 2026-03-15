@@ -37,13 +37,13 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Palmtree, Heart, ArrowRightLeft, RefreshCw } from "lucide-react";
 import { adjustLeaveBalance, cashoutFlexToToil, processAccruals } from "@/app/(authenticated)/leave/actions";
-import { formatFlexMinutes, formatDateAU } from "@/lib/utils/format";
+import { formatToilMinutes, formatDateAU } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import type { LeaveBalance, LeaveTransaction } from "@/lib/types/database";
 
 interface LeavePageClientProps {
   leaveBalances: LeaveBalance[];
-  flexBalance: number;
+  toilBalance: number;
   transactions: LeaveTransaction[];
 }
 
@@ -53,7 +53,7 @@ const leaveConfig = {
   toil: { label: "TOIL", icon: ArrowRightLeft, color: "text-purple-600 dark:text-purple-400" },
 };
 
-export function LeavePageClient({ leaveBalances, flexBalance, transactions }: LeavePageClientProps) {
+export function LeavePageClient({ leaveBalances, toilBalance, transactions }: LeavePageClientProps) {
   const [adjustType, setAdjustType] = useState("annual");
   const [adjustHours, setAdjustHours] = useState("");
   const [adjustDescription, setAdjustDescription] = useState("");
@@ -144,15 +144,15 @@ export function LeavePageClient({ leaveBalances, flexBalance, transactions }: Le
         })}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Flex Balance</CardTitle>
+            <CardTitle className="text-sm font-medium">TOIL Balance</CardTitle>
           </CardHeader>
           <CardContent>
             <div className={cn(
               "text-2xl font-bold",
-              flexBalance > 0 && "text-green-600 dark:text-green-400",
-              flexBalance < 0 && "text-red-600 dark:text-red-400",
+              toilBalance > 0 && "text-green-600 dark:text-green-400",
+              toilBalance < 0 && "text-red-600 dark:text-red-400",
             )}>
-              {formatFlexMinutes(flexBalance)}
+              {formatToilMinutes(toilBalance)}
             </div>
           </CardContent>
         </Card>
@@ -162,7 +162,7 @@ export function LeavePageClient({ leaveBalances, flexBalance, transactions }: Le
         <TabsList>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="adjust">Adjust Balance</TabsTrigger>
-          <TabsTrigger value="cashout">Flex Cashout</TabsTrigger>
+          <TabsTrigger value="cashout">TOIL Cashout</TabsTrigger>
         </TabsList>
 
         <TabsContent value="transactions" className="space-y-4">
@@ -276,11 +276,11 @@ export function LeavePageClient({ leaveBalances, flexBalance, transactions }: Le
         <TabsContent value="cashout">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Flex to TOIL Cashout</CardTitle>
+              <CardTitle className="text-base">TOIL Cashout</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Convert flex time to TOIL. Current flex balance: {formatFlexMinutes(flexBalance)}
+                Convert TOIL balance to leave. Current TOIL balance: {formatToilMinutes(toilBalance)}
               </p>
               <div className="space-y-2">
                 <Label>Hours to Convert</Label>
@@ -301,7 +301,7 @@ export function LeavePageClient({ leaveBalances, flexBalance, transactions }: Le
                   <AlertDialogHeader>
                     <AlertDialogTitle>Confirm Cashout</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will debit {cashoutHours}h from your flex balance and credit it to your TOIL balance.
+                      This will debit {cashoutHours}h from your TOIL balance and credit it to leave.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
