@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarDays } from "lucide-react";
 import type { TimesheetEntry } from "@/lib/types/database";
-import { formatWorkedMinutes, formatFlexMinutes, getDayName, addDays, entryTypeLabel } from "@/lib/utils/format";
+import { formatWorkedMinutes, formatToilMinutes, getDayName, addDays, entryTypeLabel } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 
 interface WeekSummaryProps {
@@ -13,7 +13,7 @@ export function WeekSummary({ entries, weekStart }: WeekSummaryProps) {
   const weekdays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i));
   const entryMap = new Map(entries.map((e) => [e.date, e]));
   const totalWorked = entries.reduce((sum, e) => sum + e.worked_minutes, 0);
-  const totalFlex = entries.reduce((sum, e) => sum + e.flex_minutes, 0);
+  const totalToil = entries.reduce((sum, e) => sum + e.toil_minutes, 0);
 
   return (
     <Card>
@@ -47,12 +47,12 @@ export function WeekSummary({ entries, weekStart }: WeekSummaryProps) {
                   <span
                     className={cn(
                       "text-xs font-medium",
-                      entry.flex_minutes > 0 && "text-green-600 dark:text-green-400",
-                      entry.flex_minutes < 0 && "text-red-600 dark:text-red-400",
-                      entry.flex_minutes === 0 && "text-muted-foreground"
+                      entry.toil_minutes > 0 && "text-green-600 dark:text-green-400",
+                      entry.toil_minutes < 0 && "text-red-600 dark:text-red-400",
+                      entry.toil_minutes === 0 && "text-muted-foreground"
                     )}
                   >
-                    {formatFlexMinutes(entry.flex_minutes)}
+                    {formatToilMinutes(entry.toil_minutes)}
                   </span>
                 )}
               </div>
@@ -64,12 +64,12 @@ export function WeekSummary({ entries, weekStart }: WeekSummaryProps) {
           <span
             className={cn(
               "font-bold",
-              totalFlex > 0 && "text-green-600 dark:text-green-400",
-              totalFlex < 0 && "text-red-600 dark:text-red-400",
-              totalFlex === 0 && "text-muted-foreground"
+              totalToil > 0 && "text-green-600 dark:text-green-400",
+              totalToil < 0 && "text-red-600 dark:text-red-400",
+              totalToil === 0 && "text-muted-foreground"
             )}
           >
-            {formatFlexMinutes(totalFlex)}
+            {formatToilMinutes(totalToil)}
           </span>
         </div>
       </CardContent>

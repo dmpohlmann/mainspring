@@ -2,14 +2,14 @@ import { createClient } from "@/lib/supabase/server";
 import { toDateString, getWeekStart } from "@/lib/utils/format";
 import { getPayFortnight, DEFAULT_ANCHOR_DATE, parseAnchorDate, toUTCDateString } from "@/lib/utils/pay-fortnight";
 
-export async function getFlexBalance() {
+export async function getToilBalance() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("timesheet_entries")
-    .select("flex_minutes");
+    .select("toil_minutes");
 
   if (error) throw error;
-  return (data || []).reduce((sum, e) => sum + e.flex_minutes, 0);
+  return (data || []).reduce((sum, e) => sum + e.toil_minutes, 0);
 }
 
 export async function getLeaveBalances() {

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { CalendarCheck, Plus } from "lucide-react";
 import Link from "next/link";
 import type { TimesheetEntry } from "@/lib/types/database";
-import { formatTime, formatWorkedMinutes, formatFlexMinutes, entryTypeLabel } from "@/lib/utils/format";
+import { formatTime, formatWorkedMinutes, formatToilMinutes, entryTypeLabel } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 
 interface TodayStatusProps {
@@ -25,12 +25,12 @@ export function TodayStatus({ entry }: TodayStatusProps) {
               <span
                 className={cn(
                   "text-sm font-bold",
-                  entry.flex_minutes > 0 && "text-green-600 dark:text-green-400",
-                  entry.flex_minutes < 0 && "text-red-600 dark:text-red-400",
-                  entry.flex_minutes === 0 && "text-muted-foreground"
+                  entry.toil_minutes > 0 && "text-green-600 dark:text-green-400",
+                  entry.toil_minutes < 0 && "text-red-600 dark:text-red-400",
+                  entry.toil_minutes === 0 && "text-muted-foreground"
                 )}
               >
-                {formatFlexMinutes(entry.flex_minutes)}
+                {formatToilMinutes(entry.toil_minutes)}
               </span>
             </div>
             {entry.entry_type === "work" && (
