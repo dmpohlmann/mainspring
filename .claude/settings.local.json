@@ -13,7 +13,15 @@
       "Bash(npx:*)",
       "Bash(rm:*)",
       "Bash(cp:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "mcp__claude_ai_Supabase__restore_project",
+      "mcp__claude_ai_Supabase__get_project",
+      "mcp__claude_ai_Supabase__get_project_url",
+      "mcp__claude_ai_Supabase__get_publishable_keys",
+      "WebFetch(domain:api.github.com)",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "mcp__claude_ai_Supabase__search_docs"
     ]
   }
 }
