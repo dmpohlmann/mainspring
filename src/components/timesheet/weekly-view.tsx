@@ -20,7 +20,7 @@ import {
   formatDateAU,
   formatTime,
   formatWorkedMinutes,
-  formatFlexMinutes,
+  formatToilMinutes,
   entryTypeLabel,
   isWeekend,
   addDays,
@@ -40,7 +40,7 @@ export function WeeklyView({ entries, startDate, view, payPeriodLabel }: WeeklyV
   const entryMap = new Map(entries.map((e) => [e.date, e]));
 
   const totalWorked = entries.reduce((sum, e) => sum + e.worked_minutes, 0);
-  const totalFlex = entries.reduce((sum, e) => sum + e.flex_minutes, 0);
+  const totalToil = entries.reduce((sum, e) => sum + e.toil_minutes, 0);
 
   const navigate = (offset: number) => {
     const newStart = addDays(startDate, offset);
@@ -93,7 +93,7 @@ export function WeeklyView({ entries, startDate, view, payPeriodLabel }: WeeklyV
                   <TableHead className="hidden sm:table-cell">Start</TableHead>
                   <TableHead className="hidden sm:table-cell">End</TableHead>
                   <TableHead>Worked</TableHead>
-                  <TableHead>Flex</TableHead>
+                  <TableHead>TOIL</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -136,11 +136,11 @@ export function WeeklyView({ entries, startDate, view, payPeriodLabel }: WeeklyV
                       <TableCell>
                         {entry && (
                           <span className={cn(
-                            entry.flex_minutes > 0 && "text-green-600 dark:text-green-400",
-                            entry.flex_minutes < 0 && "text-red-600 dark:text-red-400",
-                            entry.flex_minutes === 0 && "text-muted-foreground"
+                            entry.toil_minutes > 0 && "text-green-600 dark:text-green-400",
+                            entry.toil_minutes < 0 && "text-red-600 dark:text-red-400",
+                            entry.toil_minutes === 0 && "text-muted-foreground"
                           )}>
-                            {formatFlexMinutes(entry.flex_minutes)}
+                            {formatToilMinutes(entry.toil_minutes)}
                           </span>
                         )}
                       </TableCell>
@@ -157,10 +157,10 @@ export function WeeklyView({ entries, startDate, view, payPeriodLabel }: WeeklyV
                   <TableCell>
                     <span className={cn(
                       "font-bold",
-                      totalFlex > 0 && "text-green-600 dark:text-green-400",
-                      totalFlex < 0 && "text-red-600 dark:text-red-400",
+                      totalToil > 0 && "text-green-600 dark:text-green-400",
+                      totalToil < 0 && "text-red-600 dark:text-red-400",
                     )}>
-                      {formatFlexMinutes(totalFlex)}
+                      {formatToilMinutes(totalToil)}
                     </span>
                   </TableCell>
                 </TableRow>

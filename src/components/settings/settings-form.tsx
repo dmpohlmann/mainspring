@@ -12,7 +12,7 @@ import type { Settings, LeaveBalance } from "@/lib/types/database";
 
 interface SettingsFormProps {
   settings: Settings | null;
-  currentFlexMinutes: number;
+  currentToilMinutes: number;
   leaveBalances: LeaveBalance[];
 }
 

@@ -21,7 +21,7 @@ function toDateString(date: Date): string {
 export function TimesheetEntryPage({ initialDate }: TimesheetEntryPageProps) {
   const [selectedDate, setSelectedDate] = useState(initialDate || toDateString(new Date()));
   const [entry, setEntry] = useState<TimesheetEntry | null>(null);
-  const [flexBalance, setFlexBalance] = useState(0);
+  const [toilBalance, setToilBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
@@ -31,12 +31,12 @@ export function TimesheetEntryPage({ initialDate }: TimesheetEntryPageProps) {
 
     const [entryResult, flexResult] = await Promise.all([
       supabase.from("timesheet_entries").select("*").eq("date", selectedDate).maybeSingle(),
-      supabase.from("timesheet_entries").select("flex_minutes"),
+      supabase.from("timesheet_entries").select("toil_minutes"),
     ]);
 
     setEntry(entryResult.data);
-    const total = (flexResult.data || []).reduce((sum: number, e: { flex_minutes: number }) => sum + e.flex_minutes, 0);
-    setFlexBalance(total);
+    const total = (flexResult.data || []).reduce((sum: number, e: { toil_minutes: number }) => sum + e.toil_minutes, 0);
+    setToilBalance(total);
     setLoading(false);
   }, [selectedDate]);
 
@@ -100,7 +100,7 @@ export function TimesheetEntryPage({ initialDate }: TimesheetEntryPageProps) {
         <EntryForm
           date={selectedDate}
           entry={entry}
-          flexBalance={flexBalance}
+          toilBalance={toilBalance}
           onSaved={fetchEntry}
         />
       )}

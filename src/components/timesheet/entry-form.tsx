@@ -26,15 +26,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { upsertTimesheetEntry, deleteTimesheetEntry } from "@/app/(authenticated)/timesheet/actions";
-import { FlexDisplay } from "./flex-display";
-import { calculateWorkedMinutes, calculateFlexMinutes, calculateLunchDuration } from "@/lib/utils/time-calculations";
+import { ToilDisplay } from "./toil-display";
+import { calculateWorkedMinutes, calculateToilMinutes, calculateLunchDuration } from "@/lib/utils/time-calculations";
 import { formatWorkedMinutes } from "@/lib/utils/format";
 import type { TimesheetEntry, EntryType } from "@/lib/types/database";
 
 interface EntryFormProps {
   date: string;
   entry: TimesheetEntry | null;
-  flexBalance: number;
+  toilBalance: number;
   onSaved: () => void;
 }
 
@@ -43,11 +43,11 @@ const ENTRY_TYPES: { value: EntryType; label: string }[] = [
   { value: "annual_leave", label: "Annual Leave" },
   { value: "personal_leave", label: "Personal Leave" },
   { value: "public_holiday", label: "Public Holiday" },
-  { value: "flex_day", label: "Flex Day" },
+  { value: "toil_day", label: "TOIL Day" },
   { value: "other", label: "Other" },
 ];
 
-export function EntryForm({ date, entry, flexBalance, onSaved }: EntryFormProps) {
+export function EntryForm({ date, entry, toilBalance, onSaved }: EntryFormProps) {
   const [entryType, setEntryType] = useState<EntryType>(entry?.entry_type || "work");
   const [startTime, setStartTime] = useState(entry?.start_time?.slice(0, 5) || "08:00");
   const [lunchStart, setLunchStart] = useState(entry?.lunch_start?.slice(0, 5) || "12:00");
@@ -70,14 +70,14 @@ export function EntryForm({ date, entry, flexBalance, onSaved }: EntryFormProps)
 
   // Live calculation
   let workedMinutes = 0;
-  let flexMinutes = 0;
+  let toilMinutes = 0;
   let lunchDuration = 0;
   let canCalculate = false;
 
   if (showTimeFields && startTime && endTime && lunchStart && lunchEnd) {
     try {
       workedMinutes = calculateWorkedMinutes(startTime, endTime, lunchStart, lunchEnd);
-      flexMinutes = calculateFlexMinutes(workedMinutes);
+      toilMinutes = calculateToilMinutes(workedMinutes);
       lunchDuration = calculateLunchDuration(lunchStart, lunchEnd);
       canCalculate = workedMinutes > 0;
     } catch {
@@ -85,11 +85,11 @@ export function EntryForm({ date, entry, flexBalance, onSaved }: EntryFormProps)
     }
   }
 
-  if (entryType === "flex_day") {
-    flexMinutes = -450;
+  if (entryType === "toil_day") {
+    toilMinutes = -450;
   }
 
-  const projectedBalance = flexBalance - (entry?.flex_minutes || 0) + flexMinutes;
+  const projectedBalance = toilBalance - (entry?.toil_minutes || 0) + toilMinutes;
 
   const handleSubmit = async () => {
     // Validation for work days
@@ -202,25 +202,25 @@ export function EntryForm({ date, entry, flexBalance, onSaved }: EntryFormProps)
               <span className="font-medium">{formatWorkedMinutes(lunchDuration)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Day Flex</span>
-              <FlexDisplay minutes={flexMinutes} className="font-medium" />
+              <span className="text-muted-foreground">Day TOIL</span>
+              <ToilDisplay minutes={toilMinutes} className="font-medium" />
             </div>
             <div className="flex justify-between text-sm border-t pt-1 mt-1">
               <span className="text-muted-foreground">Projected Balance</span>
-              <FlexDisplay minutes={projectedBalance} className="font-bold" />
+              <ToilDisplay minutes={projectedBalance} className="font-bold" />
             </div>
           </div>
         )}
 
-        {entryType === "flex_day" && (
+        {entryType === "toil_day" && (
           <div className="rounded-md border p-3 space-y-1" aria-live="polite">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Day Flex</span>
-              <FlexDisplay minutes={-450} className="font-medium" />
+              <span className="text-muted-foreground">Day TOIL</span>
+              <ToilDisplay minutes={-450} className="font-medium" />
             </div>
             <div className="flex justify-between text-sm border-t pt-1 mt-1">
               <span className="text-muted-foreground">Projected Balance</span>
-              <FlexDisplay minutes={projectedBalance} className="font-bold" />
+              <ToilDisplay minutes={projectedBalance} className="font-bold" />
             </div>
           </div>
         )}
