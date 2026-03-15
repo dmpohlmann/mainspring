@@ -1,12 +1,12 @@
 import { cn } from "@/lib/utils";
-import { formatFlexMinutes } from "@/lib/utils/format";
+import { formatToilMinutes } from "@/lib/utils/format";
 
-interface FlexDisplayProps {
+interface ToilDisplayProps {
   minutes: number;
   className?: string;
 }
 
-export function FlexDisplay({ minutes, className }: FlexDisplayProps) {
+export function ToilDisplay({ minutes, className }: ToilDisplayProps) {
   return (
     <span
       className={cn(
@@ -16,7 +16,7 @@ export function FlexDisplay({ minutes, className }: FlexDisplayProps) {
         className
       )}
     >
-      {formatFlexMinutes(minutes)}
+      {formatToilMinutes(minutes)}
     </span>
   );
 }
