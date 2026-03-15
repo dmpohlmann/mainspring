@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { toCSV } from "@/lib/utils/csv";
-import { formatDateAU, formatTime, formatWorkedMinutes, formatFlexMinutes, entryTypeLabel } from "@/lib/utils/format";
+import { formatDateAU, formatTime, formatWorkedMinutes, formatToilMinutes, entryTypeLabel } from "@/lib/utils/format";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     "Lunch Start",
     "Lunch End",
     "Worked",
-    "Flex",
+    "TOIL",
     "Notes",
   ];
 
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     formatTime(e.lunch_start),
     formatTime(e.lunch_end),
     formatWorkedMinutes(e.worked_minutes),
-    formatFlexMinutes(e.flex_minutes),
+    formatToilMinutes(e.toil_minutes),
     e.note || "",
   ]);
 
