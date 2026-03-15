@@ -21,7 +21,11 @@
       "WebFetch(domain:api.github.com)",
       "mcp__claude_ai_Supabase__apply_migration",
       "mcp__claude_ai_Supabase__execute_sql",
-      "mcp__claude_ai_Supabase__search_docs"
+      "mcp__claude_ai_Supabase__search_docs",
+      "Bash(gh repo:*)",
+      "WebFetch(domain:mainspringapp.vercel.app)",
+      "WebFetch(domain:mainspring-five.vercel.app)",
+      "Bash(dir:*)"
     ]
   }
 }
