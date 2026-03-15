@@ -1,4 +1,4 @@
-export function formatFlexMinutes(minutes: number): string {
+export function formatToilMinutes(minutes: number): string {
   const sign = minutes >= 0 ? "+" : "\u2212";
   const abs = Math.abs(minutes);
   const h = Math.floor(abs / 60);
@@ -76,7 +76,7 @@ export function entryTypeLabel(type: string): string {
     annual_leave: "Annual Leave",
     personal_leave: "Personal Leave",
     public_holiday: "Public Holiday",
-    flex_day: "Flex Day",
+    toil_day: "TOIL Day",
     other: "Other",
   };
   return labels[type] || type;

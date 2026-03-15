@@ -1,4 +1,4 @@
-export type EntryType = "work" | "annual_leave" | "personal_leave" | "public_holiday" | "flex_day" | "other";
+export type EntryType = "work" | "annual_leave" | "personal_leave" | "public_holiday" | "toil_day" | "other";
 export type LeaveType = "annual" | "personal" | "toil";
 
 export interface TimesheetEntry {
@@ -10,7 +10,7 @@ export interface TimesheetEntry {
   lunch_start: string | null;
   lunch_end: string | null;
   worked_minutes: number;
-  flex_minutes: number;
+  toil_minutes: number;
   note: string | null;
   entry_type: EntryType;
   created_at: string;
@@ -55,10 +55,10 @@ export interface Database {
     Tables: {
       timesheet_entries: {
         Row: TimesheetEntry;
-        Insert: Omit<TimesheetEntry, "id" | "created_at" | "updated_at" | "worked_minutes" | "flex_minutes"> & {
+        Insert: Omit<TimesheetEntry, "id" | "created_at" | "updated_at" | "worked_minutes" | "toil_minutes"> & {
           id?: string;
           worked_minutes?: number;
-          flex_minutes?: number;
+          toil_minutes?: number;
         };
         Update: Partial<Omit<TimesheetEntry, "id" | "created_at" | "updated_at">>;
         Relationships: [];

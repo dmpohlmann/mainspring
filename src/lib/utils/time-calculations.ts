@@ -26,7 +26,7 @@ export function calculateWorkedMinutes(
   return totalMinutes - lunchMinutes;
 }
 
-export function calculateFlexMinutes(
+export function calculateToilMinutes(
   workedMinutes: number,
   standardDayMinutes: number = STANDARD_DAY_MINUTES
 ): number {
