@@ -179,8 +179,24 @@ function isWeekendDate(dateStr: string) {
   return d === 0 || d === 6;
 }
 
+function entryWorked(e: MockEntry) {
+  if (e.type !== "work") return 0;
+  return toMin(e.end) - toMin(e.start) - (toMin(e.lend) - toMin(e.lstart));
+}
+
 const fortnightFlex = Object.values(FORTNIGHT_ENTRIES).reduce(
   (a, e) => a + entryFlex(e),
+  0
+);
+
+// Opening flex balance (start of week) and this week's running totals.
+const OPENING_FLEX = 765; // +12h 45m
+const WEEK_WORKED = THIS_WEEK.reduce(
+  (a, d) => a + (FORTNIGHT_ENTRIES[d] ? entryWorked(FORTNIGHT_ENTRIES[d]) : 0),
+  0
+);
+const WEEK_FLEX = THIS_WEEK.reduce(
+  (a, d) => a + (FORTNIGHT_ENTRIES[d] ? entryFlex(FORTNIGHT_ENTRIES[d]) : 0),
   0
 );
 
@@ -201,20 +217,39 @@ const TAB_CODES: Record<string, string> = {
   settings: "SET",
 };
 
-// Panels per tab. `key` is the single-letter jump (chosen to not clash with the
-// tab letters d/t/c/l/s), `label` doubles as a command-line alias.
-type Panel = { id: string; key: string; label: string };
+// Panels per tab. `code` is the 2-letter command alias (e.g. d.ne, d.dt, t.ft).
+type Panel = { id: string; code: string; label: string };
 const PANELS: Record<string, Panel[]> = {
   dashboard: [
-    { id: "balances", key: "b", label: "balances" },
-    { id: "thisweek", key: "w", label: "thisweek" },
-    { id: "entry", key: "e", label: "entry" },
+    { id: "balances", code: "ba", label: "balances" },
+    { id: "thisweek", code: "dt", label: "thisweek" },
+    { id: "entry", code: "ne", label: "new entry" },
   ],
-  timesheet: [{ id: "fortnight", key: "f", label: "fortnight" }],
+  timesheet: [{ id: "fortnight", code: "ft", label: "fortnight" }],
   calendar: [],
   leave: [],
   settings: [],
 };
+
+// Resolve a command fragment to a tab / panel (accepts code, id, name, letter).
+function resolveTab(part: string) {
+  return (
+    TABS.find(
+      (t) => t === part || TAB_CODES[t].toLowerCase() === part || t[0] === part
+    ) ?? null
+  );
+}
+function resolvePanel(tabId: string, part: string) {
+  return (
+    (PANELS[tabId] ?? []).find(
+      (p) =>
+        p.code === part ||
+        p.id === part ||
+        p.label.replace(/\s/g, "") === part ||
+        p.id[0] === part
+    ) ?? null
+  );
+}
 
 // Classic TUI function-key bar (only F1/F10 wired in this preview).
 const FKEYS: [string, string][] = [
@@ -389,31 +424,42 @@ export default function PreviewPage() {
   };
   const focusPanel = (panelId: string) => {
     setActivePanel(panelId);
-    requestAnimationFrame(() =>
-      document
-        .getElementById(`panel-${panelId}`)
-        ?.scrollIntoView({ block: "nearest" })
-    );
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`panel-${panelId}`);
+      el?.scrollIntoView({ block: "nearest" });
+      // Entry panel: focus the first field so Tab cycles through them.
+      if (panelId === "entry") el?.querySelector<HTMLElement>("input")?.focus();
+    });
   };
 
-  // The `/` command line: tabs (name/code/letter), panels (id/letter), actions.
+  // The `/` command line: tab.panel (d.ne), tab (t), panel (ne), or an action.
   const runCommand = (raw: string) => {
     const cmd = raw.trim().toLowerCase();
     setCmdOpen(false);
     setCmdValue("");
     if (!cmd) return;
-    const tabMatch = TABS.find(
-      (t) => t === cmd || TAB_CODES[t].toLowerCase() === cmd || t[0] === cmd
-    );
-    if (tabMatch) {
-      goTab(tabMatch);
+
+    // Absolute "tab.panel" — jump to the tab, then drop into the panel.
+    if (cmd.includes(".")) {
+      const [tp, pp] = cmd.split(".");
+      const t = resolveTab(tp);
+      if (t) {
+        goTab(t);
+        const p = pp ? resolvePanel(t, pp) : null;
+        if (p) focusPanel(p.id);
+        return;
+      }
+    }
+    // Bare tab.
+    const t = resolveTab(cmd);
+    if (t) {
+      goTab(t);
       return;
     }
-    const panelMatch = (PANELS[tab] ?? []).find(
-      (p) => p.id === cmd || p.label === cmd || p.key === cmd
-    );
-    if (panelMatch) {
-      focusPanel(panelMatch.id);
+    // Bare panel on the current tab.
+    const p = resolvePanel(tab, cmd);
+    if (p) {
+      focusPanel(p.id);
       return;
     }
     switch (cmd) {
@@ -466,45 +512,45 @@ export default function PreviewPage() {
       // Everything below only when NOT typing and the command line is closed.
       if (typing || cmdOpen) return;
 
-      const panels = PANELS[tab] ?? [];
+      // Contextual keys when This Week is the active panel:
+      // arrows change the selected day, Enter drops into the entry panel.
+      if (activePanel === "thisweek") {
+        if (
+          e.key === "ArrowUp" ||
+          e.key === "ArrowDown" ||
+          e.key === "ArrowLeft" ||
+          e.key === "ArrowRight"
+        ) {
+          e.preventDefault();
+          const sel = THIS_WEEK.filter((d) => !isWeekendDate(d));
+          const fwd = e.key === "ArrowDown" || e.key === "ArrowRight";
+          const i = sel.indexOf(selectedDate);
+          const next =
+            i === -1
+              ? fwd
+                ? 0
+                : sel.length - 1
+              : fwd
+                ? (i + 1) % sel.length
+                : (i - 1 + sel.length) % sel.length;
+          setSelectedDate(sel[next]);
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          focusPanel("entry");
+          return;
+        }
+      }
 
       if (e.key === "/") {
         e.preventDefault();
         setCmdOpen(true);
         return;
       }
-      // Left/Right cycle tabs, Up/Down cycle panels within the current tab.
-      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        const i = TABS.indexOf(tab);
-        const next =
-          e.key === "ArrowRight"
-            ? (i + 1) % TABS.length
-            : (i - 1 + TABS.length) % TABS.length;
-        goTab(TABS[next]);
-        return;
-      }
-      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && panels.length) {
-        e.preventDefault();
-        const i = panels.findIndex((p) => p.id === activePanel);
-        const next =
-          i === -1
-            ? e.key === "ArrowDown"
-              ? 0
-              : panels.length - 1
-            : e.key === "ArrowDown"
-              ? (i + 1) % panels.length
-              : (i - 1 + panels.length) % panels.length;
-        focusPanel(panels[next].id);
-        return;
-      }
+      // Bare first-letter tab jump (d/t/c/l/s).
       if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        const key = e.key.toLowerCase();
-        const p = panels.find((p) => p.key === key);
-        if (p) {
-          focusPanel(p.id);
-          return;
-        }
-        const t = TABS.find((tab) => tab[0] === key);
+        const t = resolveTab(e.key.toLowerCase());
         if (t) goTab(t);
       }
     };
@@ -601,58 +647,91 @@ export default function PreviewPage() {
             WEEK_START_STR
           )} – ${dayDateLabel(THIS_WEEK[6])}]`}
         >
-          <div className="space-y-0.5">
-            {THIS_WEEK.map((date) => {
-              const isToday = date === TODAY_STR;
-              const isSelected = date === selectedDate;
-              const weekend = isWeekendDate(date);
-              // no entries in this mock; a past weekday with no entry = missing
-              const missing = !weekend && date < TODAY_STR;
-              return (
-                <button
-                  type="button"
-                  key={date}
-                  disabled={weekend}
-                  onClick={() => setSelectedDate(date)}
-                  className={`flex w-full items-center gap-3 px-2 py-1 text-left text-sm transition-colors ${
-                    weekend
-                      ? "cursor-default text-muted-foreground/50"
-                      : "hover:bg-muted"
-                  } ${
-                    isSelected
-                      ? "bg-secondary/20 ring-1 ring-secondary/60"
-                      : isToday
-                        ? "bg-secondary/10"
-                        : ""
-                  }`}
-                >
-                  <span className="w-[4ch] font-medium">{getDayName(date)}</span>
-                  <span className="w-[8ch] text-muted-foreground">
-                    {dayDateLabel(date)}
-                  </span>
-                  <span className="flex-1">
-                    {missing ? (
-                      <Badge
-                        variant="outline"
-                        title="no entry logged"
-                        className="w-16 justify-center border-amber-500/50 text-amber-600 dark:text-amber-400"
-                      >
-                        MISS
-                      </Badge>
-                    ) : (
-                      <span className="inline-block w-16 text-center text-muted-foreground/40">
-                        —
-                      </span>
-                    )}
-                  </span>
-                  {isToday ? (
-                    <span className="text-secondary">← today</span>
-                  ) : isSelected ? (
-                    <span className="text-secondary">▸ editing</span>
-                  ) : null}
-                </button>
-              );
-            })}
+          <div className="grid gap-6 md:grid-cols-[1fr_auto]">
+            <div className="space-y-0.5">
+              {THIS_WEEK.map((date) => {
+                const isToday = date === TODAY_STR;
+                const isSelected = date === selectedDate;
+                const weekend = isWeekendDate(date);
+                const entry = FORTNIGHT_ENTRIES[date];
+                // a past weekday with no entry = missing
+                const missing = !entry && !weekend && date < TODAY_STR;
+                const f = entry ? entryFlex(entry) : 0;
+                return (
+                  <button
+                    type="button"
+                    key={date}
+                    disabled={weekend}
+                    onClick={() => setSelectedDate(date)}
+                    className={`flex w-full items-center gap-3 px-2 py-1 text-left text-sm transition-colors ${
+                      weekend
+                        ? "cursor-default text-muted-foreground/50"
+                        : "hover:bg-muted"
+                    } ${
+                      isSelected
+                        ? "bg-secondary/20 ring-1 ring-secondary/60"
+                        : isToday
+                          ? "bg-secondary/10"
+                          : ""
+                    }`}
+                  >
+                    <span className="w-[4ch] font-medium">{getDayName(date)}</span>
+                    <span className="w-[8ch] text-muted-foreground">
+                      {dayDateLabel(date)}
+                    </span>
+                    <span className="flex flex-1 items-center gap-3">
+                      {entry ? (
+                        <>
+                          <Badge
+                            variant={(TYPE_BADGE[entry.type] ?? "outline") as never}
+                            title={LABEL_BY_VALUE[entry.type] ?? entry.type}
+                            className="w-16 justify-center"
+                          >
+                            {CODE_BY_VALUE[entry.type] ?? entry.type}
+                          </Badge>
+                          <span className={flexClass(f)}>{fmtFlex(f)}</span>
+                        </>
+                      ) : missing ? (
+                        <Badge
+                          variant="outline"
+                          title="no entry logged"
+                          className="w-16 justify-center border-amber-500/50 text-amber-600 dark:text-amber-400"
+                        >
+                          MISS
+                        </Badge>
+                      ) : (
+                        <span className="inline-block w-16 text-center text-muted-foreground/40">
+                          —
+                        </span>
+                      )}
+                    </span>
+                    {isToday ? (
+                      <span className="text-secondary">← today</span>
+                    ) : isSelected ? (
+                      <span className="text-secondary">▸ editing</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* weekly running-balance readout (mirrors the entry live-calc) */}
+            <div className="min-w-56 space-y-2 border-l border-border pl-6">
+              <p className="uppercase text-muted-foreground">week running</p>
+              <Readout k="worked" v={fmtHM(WEEK_WORKED)} />
+              <Readout
+                k="flex (week)"
+                v={fmtFlex(WEEK_FLEX)}
+                cls={flexClass(WEEK_FLEX)}
+              />
+              <div className="my-2 border-t border-dashed border-border" />
+              <Readout k="opening" v={fmtFlex(OPENING_FLEX)} cls={flexClass(OPENING_FLEX)} />
+              <Readout
+                k="balance →"
+                v={fmtFlex(OPENING_FLEX + WEEK_FLEX)}
+                cls={flexClass(OPENING_FLEX + WEEK_FLEX)}
+              />
+            </div>
           </div>
         </TerminalFrame>
 
@@ -908,7 +987,7 @@ export default function PreviewPage() {
             </button>
           ))}
           <span className="ml-auto text-muted-foreground/50">
-            <span className="text-secondary">/</span> command · d t c l s jump
+            <span className="text-secondary">/</span>tab.panel · d t c l s tabs
           </span>
         </div>
       </div>
@@ -929,7 +1008,7 @@ export default function PreviewPage() {
                   setCmdValue("");
                 }
               }}
-              placeholder="dsh tsh cal lve set · save new delete refresh · light dark · help"
+              placeholder="d.ne · d.dt · t.ft · dsh tsh cal lve set · save new delete · light dark"
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground/40"
             />
             <span className="text-muted-foreground/60">⏎ run · esc cancel</span>
@@ -953,14 +1032,14 @@ export default function PreviewPage() {
                   <span className="text-secondary">$</span> keyboard &amp; codes
                 </p>
                 <div className="space-y-1">
-                  <HelpRow k="/" v="command line (tabs, panels, actions)" />
-                  <HelpRow k="d t c l s" v="jump to tab (first letter)" />
-                  <HelpRow k="b w e f" v="jump to panel (first letter)" />
-                  <HelpRow k="← →" v="prev / next tab" />
-                  <HelpRow k="↑ ↓" v="prev / next panel" />
+                  <HelpRow k="/tab.panel" v="jump to panel (e.g. /d.ne, /d.dt)" />
+                  <HelpRow k="/tab" v="jump to tab (e.g. /t, /timesheet)" />
+                  <HelpRow k="d t c l s" v="quick tab jump (first letter)" />
+                  <HelpRow k="in thisweek: ↑ ↓" v="change selected day" />
+                  <HelpRow k="in thisweek: ⏎" v="go to entry panel" />
+                  <HelpRow k="in entry: Tab" v="next / prev field" />
                   <HelpRow k="F1..F10" v="function-key actions (see bar)" />
                   <HelpRow k="Esc" v="close / cancel" />
-                  <HelpRow k="click a week row" v="edit that day" />
                 </div>
                 <div className="border-t border-dashed border-border pt-2">
                   <p className="mb-1 uppercase text-muted-foreground">
