@@ -33,7 +33,9 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const publicPaths = ["/login", "/auth/callback", "/not-authorized"];
+  // NOTE: "/preview" is a TEMPORARY no-auth route for previewing the terminal UI.
+  // Remove it (and src/app/preview) once the reskin is approved.
+  const publicPaths = ["/login", "/auth/callback", "/not-authorized", "/preview"];
   const isPublicPath = publicPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );

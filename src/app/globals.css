@@ -7,8 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, monospace;
+  --font-sans: var(--font-victor-mono), ui-monospace, "SFMono-Regular", "Menlo", monospace;
+  --font-mono: var(--font-victor-mono), ui-monospace, "SFMono-Regular", "Menlo", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -55,30 +55,31 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  /* Terminal aesthetic — "paper terminal" light theme */
+  --background: #f4f1e9;
+  --foreground: #1c1b18;
+  --card: #fbf9f3;
+  --card-foreground: #1c1b18;
+  --popover: #fbf9f3;
+  --popover-foreground: #1c1b18;
   --primary: #1B3A5C;
-  --primary-foreground: #ffffff;
+  --primary-foreground: #f4f1e9;
   --secondary: #C9964C;
-  --secondary-foreground: #1B3A5C;
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: #1B3A5C;
+  --secondary-foreground: #1c1b18;
+  --muted: #e8e3d6;
+  --muted-foreground: #6b665a;
+  --accent: #e3ddcd;
+  --accent-foreground: #1c1b18;
+  --destructive: #b3261e;
+  --border: #cabfa6;
+  --input: #cabfa6;
+  --ring: #C9964C;
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.625rem;
+  --radius: 0;
 
   /* Sidebar — brand navy */
   --sidebar: #1B3A5C;
@@ -99,24 +100,25 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  /* Terminal aesthetic — "phosphor slate" dark theme (hero) */
+  --background: #0b0e14;
+  --foreground: #cdd3c8;
+  --card: #11151d;
+  --card-foreground: #cdd3c8;
+  --popover: #11151d;
+  --popover-foreground: #cdd3c8;
   --primary: #C8D4E2;
-  --primary-foreground: #1B3A5C;
+  --primary-foreground: #0b0e14;
   --secondary: #D4AA6A;
-  --secondary-foreground: #1B3A5C;
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: #C8D4E2;
+  --secondary-foreground: #0b0e14;
+  --muted: #1a1f29;
+  --muted-foreground: #8a92a0;
+  --accent: #1a1f29;
+  --accent-foreground: #cdd3c8;
+  --destructive: #e06c63;
+  --border: #283041;
+  --input: #283041;
+  --ring: #D4AA6A;
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
