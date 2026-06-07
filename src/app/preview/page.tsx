@@ -8,7 +8,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +27,7 @@ import {
   DEFAULT_ANCHOR_DATE,
 } from "@/lib/utils/pay-fortnight";
 import { getDayName } from "@/lib/utils/format";
+import { toast } from "sonner";
 
 // UTC-safe date helpers for deterministic preview math (the real app utils use
 // local time, which mismatches the fixed-UTC reference date below).
@@ -104,13 +104,13 @@ function TerminalFrame({
 }) {
   return (
     <div className="border border-border bg-card">
-      <div className="flex items-center gap-2 border-b border-border bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 border-b border-border bg-muted px-3 py-1.5 text-muted-foreground">
         <span className="text-red-500">●</span>
         <span className="text-yellow-500">●</span>
         <span className="text-green-500">●</span>
         <span className="ml-2 truncate">{title}</span>
       </div>
-      <div className="p-4">{children}</div>
+      <div className="p-3">{children}</div>
     </div>
   );
 }
@@ -245,20 +245,6 @@ export default function PreviewPage() {
   const [selectedDate, setSelectedDate] = useState(TODAY_STR); // entry defaults to today
   const [showHelp, setShowHelp] = useState(false);
 
-  // F1 opens help, Esc closes it — old-school keyboard navigation.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F1") {
-        e.preventDefault();
-        setShowHelp(true);
-      } else if (e.key === "Escape") {
-        setShowHelp(false);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
   // Entry form defaults: 08:00–17:00, lunch 13:00–14:00.
   const [start, setStart] = useState("08:00");
   const [lstart, setLstart] = useState("13:00");
@@ -320,15 +306,67 @@ export default function PreviewPage() {
   const dayFlex = worked - 450 + totalLeave;
   const runningFlex = 765 + dayFlex; // 765 = +12h45 current balance
 
+  const resetForm = () => {
+    setStart("08:00");
+    setLstart("13:00");
+    setLend("14:00");
+    setEnd("17:00");
+    setBlocks([{ id: nextBlockId.current++, type: "work", end: "17:00" }]);
+  };
+
+  // Function-key actions. No backend yet, so toasts stand in for persistence.
+  const runFkey = (key: string) => {
+    switch (key) {
+      case "F1":
+        setShowHelp(true);
+        break;
+      case "F2":
+        toast.success(`Saved — ${prettyDate(selectedDate)}`);
+        break;
+      case "F3":
+        setSelectedDate(TODAY_STR);
+        resetForm();
+        setTab("dashboard");
+        toast(`New entry — ${prettyDate(TODAY_STR)}`);
+        break;
+      case "F5":
+        toast("Refreshed");
+        break;
+      case "F8":
+        toast.error(`Deleted — ${prettyDate(selectedDate)}`);
+        break;
+      case "F10":
+        toast("Signing out…");
+        break;
+    }
+  };
+
+  // Old-school keyboard nav: function keys fire actions, Esc closes overlays.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowHelp(false);
+        return;
+      }
+      if (FKEYS.some(([k]) => k === e.key)) {
+        e.preventDefault();
+        runFkey(e.key);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+      <div className="mx-auto max-w-3xl space-y-3 p-4 text-sm sm:p-6">
         {/* top bar */}
         <header className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-baseline gap-2">
             <span className="text-secondary">▰▰</span>
             <span className="font-bold tracking-tight">mainspring</span>
-            <span className="hidden text-xs text-muted-foreground sm:inline">
+            <span className="hidden text-muted-foreground sm:inline">
               the mechanism behind your working hours
             </span>
           </div>
@@ -365,37 +403,29 @@ export default function PreviewPage() {
           <>
         <Prompt>log today&apos;s hours</Prompt>
 
-        {/* dashboard summary cards */}
-        <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
-                flex balance
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-2xl font-bold ${flexClass(765)}`}>{fmtFlex(765)}</p>
-            </CardContent>
-          </Card>
+        {/* dashboard balance strip — compact bordered cells */}
+        <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="border border-border bg-card px-2 py-1.5">
+            <div className="uppercase text-muted-foreground">flex</div>
+            <div className={`font-bold ${flexClass(765)}`}>{fmtFlex(765)}</div>
+          </div>
           {[
-            { k: "annual", v: "112.5h", d: "15.0 days" },
-            { k: "personal", v: "48.0h", d: "6.4 days" },
-            { k: "toil", v: "8.0h", d: "1.1 days" },
+            { k: "annual", v: "112.5h", d: "15.0d" },
+            { k: "personal", v: "48.0h", d: "6.4d" },
+            { k: "toil", v: "8.0h", d: "1.1d" },
           ].map((b) => (
-            <Card key={b.k}>
-              <CardHeader>
-                <CardTitle
-                  title={LABEL_BY_VALUE[b.k]}
-                  className="text-xs uppercase tracking-wider text-muted-foreground"
-                >
-                  {CODE_BY_VALUE[b.k] ?? b.k}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{b.v}</p>
-                <p className="text-xs text-muted-foreground">{b.d}</p>
-              </CardContent>
-            </Card>
+            <div key={b.k} className="border border-border bg-card px-2 py-1.5">
+              <div
+                title={LABEL_BY_VALUE[b.k]}
+                className="uppercase text-muted-foreground"
+              >
+                {CODE_BY_VALUE[b.k] ?? b.k}
+              </div>
+              <div className="font-bold">
+                {b.v}{" "}
+                <span className="font-normal text-muted-foreground">/ {b.d}</span>
+              </div>
+            </div>
           ))}
         </section>
 
@@ -431,8 +461,8 @@ export default function PreviewPage() {
                         : ""
                   }`}
                 >
-                  <span className="w-10 font-medium">{getDayName(date)}</span>
-                  <span className="w-16 text-xs text-muted-foreground">
+                  <span className="w-[4ch] font-medium">{getDayName(date)}</span>
+                  <span className="w-[8ch] text-muted-foreground">
                     {dayDateLabel(date)}
                   </span>
                   <span className="flex-1">
@@ -451,9 +481,9 @@ export default function PreviewPage() {
                     )}
                   </span>
                   {isToday ? (
-                    <span className="text-xs text-secondary">← today</span>
+                    <span className="text-secondary">← today</span>
                   ) : isSelected ? (
-                    <span className="text-xs text-secondary">▸ editing</span>
+                    <span className="text-secondary">▸ editing</span>
                   ) : null}
                 </button>
               );
@@ -464,10 +494,10 @@ export default function PreviewPage() {
         {/* entry form with live calc — on dashboard, below the week view */}
         <TerminalFrame title={`mainspring — ~/entry/new [${selectedDate}]`}>
           <div className="mb-4 flex flex-wrap items-baseline gap-3 border-b border-border pb-3">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">
+            <span className="uppercase text-muted-foreground">
               entry for
             </span>
-            <span className="text-xl font-bold text-secondary">
+            <span className="font-bold text-secondary">
               {prettyDate(selectedDate)}
             </span>
             {selectedDate === TODAY_STR && (
@@ -487,7 +517,7 @@ export default function PreviewPage() {
               {/* split day — contiguous timeline of typed blocks */}
               <div className="space-y-2 border-t border-dashed border-border pt-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                  <span className="uppercase text-muted-foreground">
                     day timeline
                   </span>
                   <Button
@@ -524,7 +554,7 @@ export default function PreviewPage() {
                             className="h-7 w-20"
                           />
                         )}
-                        <span className="text-xs text-muted-foreground/60">
+                        <span className="text-muted-foreground/60">
                           ({fmtHM(mins)})
                         </span>
                         <Button
@@ -542,14 +572,14 @@ export default function PreviewPage() {
                     </div>
                   );
                 })}
-                <p className="text-xs text-muted-foreground/60">
+                <p className="text-muted-foreground/60">
                   blocks tile {start}–{end} with no gaps. “+ split” carves the
                   last block into a leave / TOIL block.
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="note" className="text-xs uppercase tracking-wider text-muted-foreground">
+                <Label htmlFor="note" className="uppercase text-muted-foreground">
                   note
                 </Label>
                 <Input id="note" placeholder="WFH, meeting notes…" />
@@ -558,7 +588,7 @@ export default function PreviewPage() {
 
             {/* live calc readout */}
             <div className="min-w-56 space-y-2 border-l border-border pl-6 text-sm">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">
+              <p className="uppercase text-muted-foreground">
                 live calc
               </p>
               <Readout k="worked" v={fmtHM(worked)} />
@@ -576,11 +606,18 @@ export default function PreviewPage() {
               <Readout k="balance →" v={fmtFlex(runningFlex)} cls={flexClass(runningFlex)} />
             </div>
           </div>
-          <div className="mt-6 flex gap-2">
-            <Button>save entry</Button>
-            <Button variant="outline">cancel</Button>
-            <Button variant="destructive" className="ml-auto">
-              delete
+          <div className="mt-6 flex items-center gap-3 text-muted-foreground">
+            <span>
+              <span className="bg-secondary px-1 text-secondary-foreground">F2</span>{" "}
+              save changes
+            </span>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="ml-auto"
+              onClick={() => runFkey("F8")}
+            >
+              delete [F8]
             </Button>
           </div>
         </TerminalFrame>
@@ -681,12 +718,12 @@ export default function PreviewPage() {
         )}
 
         {/* function-key bar */}
-        <div className="sticky bottom-0 -mx-4 mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-border bg-background px-4 py-1.5 text-xs sm:-mx-6 sm:px-6">
+        <div className="sticky bottom-0 -mx-4 mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-border bg-background px-4 py-1.5 sm:-mx-6 sm:px-6">
           {FKEYS.map(([k, label]) => (
             <button
               key={k}
               type="button"
-              onClick={() => k === "F1" && setShowHelp(true)}
+              onClick={() => runFkey(k)}
               className="flex items-center gap-1"
             >
               <span className="bg-secondary px-1 text-secondary-foreground">
@@ -724,7 +761,7 @@ export default function PreviewPage() {
                   <HelpRow k="click a week row" v="edit that day" />
                 </div>
                 <div className="border-t border-dashed border-border pt-2">
-                  <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
+                  <p className="mb-1 uppercase text-muted-foreground">
                     entry type codes
                   </p>
                   {BLOCK_TYPES.map((t) => (
@@ -779,7 +816,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+      <Label className="uppercase text-muted-foreground">
         {label}
       </Label>
       <TimeInput value={value} onChange={onChange} />
