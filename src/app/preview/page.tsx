@@ -6,7 +6,7 @@
  * the real screens. Delete this folder once the look is approved.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,8 +73,15 @@ function prettyDate(dateStr: string) {
 /* ── helpers ───────────────────────────────────────────────────────────── */
 
 function toMin(t: string) {
-  const [h, m] = t.split(":").map(Number);
+  const [h, m] = (t ?? "").split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0; // tolerate partial typing
   return h * 60 + m;
+}
+
+// Normalise digits as you type into HH:MM (e.g. "0830" → "08:30").
+function formatTimeTyping(raw: string) {
+  const d = raw.replace(/[^0-9]/g, "").slice(0, 4);
+  return d.length <= 2 ? d : `${d.slice(0, 2)}:${d.slice(2)}`;
 }
 function fmtFlex(min: number) {
   const sign = min < 0 ? "−" : "+";
@@ -142,12 +149,12 @@ type MockEntry = {
 const FORTNIGHT_ENTRIES: Record<string, MockEntry> = {
   "2026-06-04": { type: "work", start: "08:00", lstart: "12:00", lend: "12:30", end: "16:35" },
   "2026-06-09": { type: "annual", start: "—", lstart: "—", lend: "—", end: "—" },
-  "2026-06-11": { type: "flex", start: "—", lstart: "—", lend: "—", end: "—" },
+  "2026-06-11": { type: "toil", start: "—", lstart: "—", lend: "—", end: "—" },
 };
 
 function entryFlex(e: MockEntry) {
-  if (e.type === "annual") return 0;
-  if (e.type === "flex") return -450;
+  if (e.type === "toil") return -450; // TOIL/flex day off debits a full day
+  if (e.type !== "work") return 0; // leave / public holiday — no flex impact
   return toMin(e.end) - toMin(e.start) - (toMin(e.lend) - toMin(e.lstart)) - 450;
 }
 
@@ -164,10 +171,22 @@ const fortnightFlex = Object.values(FORTNIGHT_ENTRIES).reduce(
 const TYPE_BADGE: Record<string, string> = {
   work: "outline",
   annual: "default",
-  flex: "secondary",
+  personal: "default",
+  toil: "secondary",
+  public_holiday: "outline",
 };
 
 const TABS = ["dashboard", "timesheet", "calendar", "leave", "settings"];
+
+// Classic TUI function-key bar (only F1/F10 wired in this preview).
+const FKEYS: [string, string][] = [
+  ["F1", "Help"],
+  ["F2", "Save"],
+  ["F3", "New"],
+  ["F5", "Refresh"],
+  ["F8", "Delete"],
+  ["F10", "Quit"],
+];
 
 // A day is a contiguous timeline of blocks. Each block stores its own `end`;
 // its start is derived from the previous block's end (the last block always
@@ -175,12 +194,19 @@ const TABS = ["dashboard", "timesheet", "calendar", "leave", "settings"];
 type DayBlock = { id: number; type: string; end: string };
 
 const BLOCK_TYPES = [
-  { value: "work", label: "work" },
-  { value: "annual", label: "annual leave" },
-  { value: "personal", label: "personal leave" },
-  { value: "toil", label: "TOIL" },
-  { value: "public_holiday", label: "public holiday" },
+  { value: "work", code: "WRK", label: "work" },
+  { value: "personal", code: "PRS", label: "personal leave" },
+  { value: "annual", code: "REC", label: "recreation (annual) leave" },
+  { value: "toil", code: "TOIL", label: "TOIL" },
+  { value: "public_holiday", code: "PHOL", label: "public holiday" },
 ];
+
+const CODE_BY_VALUE: Record<string, string> = Object.fromEntries(
+  BLOCK_TYPES.map((t) => [t.value, t.code])
+);
+const LABEL_BY_VALUE: Record<string, string> = Object.fromEntries(
+  BLOCK_TYPES.map((t) => [t.value, t.label])
+);
 
 type BlockRange = { id: number; type: string; start: string; end: string };
 
@@ -217,6 +243,21 @@ export default function PreviewPage() {
 
   const [tab, setTab] = useState("dashboard");
   const [selectedDate, setSelectedDate] = useState(TODAY_STR); // entry defaults to today
+  const [showHelp, setShowHelp] = useState(false);
+
+  // F1 opens help, Esc closes it — old-school keyboard navigation.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F1") {
+        e.preventDefault();
+        setShowHelp(true);
+      } else if (e.key === "Escape") {
+        setShowHelp(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Entry form defaults: 08:00–17:00, lunch 13:00–14:00.
   const [start, setStart] = useState("08:00");
@@ -343,8 +384,11 @@ export default function PreviewPage() {
           ].map((b) => (
             <Card key={b.k}>
               <CardHeader>
-                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
-                  {b.k} leave
+                <CardTitle
+                  title={LABEL_BY_VALUE[b.k]}
+                  className="text-xs uppercase tracking-wider text-muted-foreground"
+                >
+                  {CODE_BY_VALUE[b.k] ?? b.k}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -393,11 +437,17 @@ export default function PreviewPage() {
                   </span>
                   <span className="flex-1">
                     {missing ? (
-                      <span className="text-amber-600 dark:text-amber-400">
-                        missing
-                      </span>
+                      <Badge
+                        variant="outline"
+                        title="no entry logged"
+                        className="w-16 justify-center border-amber-500/50 text-amber-600 dark:text-amber-400"
+                      >
+                        MISS
+                      </Badge>
                     ) : (
-                      <span className="text-muted-foreground/40">—</span>
+                      <span className="inline-block w-16 text-center text-muted-foreground/40">
+                        —
+                      </span>
                     )}
                   </span>
                   {isToday ? (
@@ -452,70 +502,43 @@ export default function PreviewPage() {
 
                 {ranges.map((r, i) => {
                   const isLast = i === ranges.length - 1;
+                  const mins = Math.max(0, toMin(r.end) - toMin(r.start));
                   return (
-                    <div key={r.id} className="flex items-end gap-2">
-                      <div className="flex-1 space-y-1">
-                        {i === 0 && (
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            type
-                          </Label>
-                        )}
-                        <select
-                          value={r.type}
-                          onChange={(e) =>
-                            updateBlock(r.id, { type: e.target.value })
-                          }
-                          className="h-8 w-full border border-input bg-background px-2 text-sm"
-                        >
-                          {BLOCK_TYPES.map((t) => (
-                            <option key={t.value} value={t.value}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-1">
-                        {i === 0 && (
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            from
-                          </Label>
-                        )}
+                    <div key={r.id} className="space-y-1.5 border border-border/60 p-2">
+                      <TokenSelect
+                        value={r.type}
+                        options={BLOCK_TYPES}
+                        onChange={(v) => updateBlock(r.id, { type: v })}
+                      />
+                      <div className="flex items-center gap-2 text-sm">
                         {/* start is derived from the previous block — read-only */}
-                        <div className="flex h-8 items-center px-1 text-sm text-muted-foreground">
-                          {r.start}
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        {i === 0 && (
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            to
-                          </Label>
-                        )}
+                        <span className="text-muted-foreground">{r.start}</span>
+                        <span className="text-muted-foreground/50">→</span>
                         {isLast ? (
                           // last block always ends at the day finish (read-only)
-                          <div className="flex h-8 items-center px-1 text-sm text-muted-foreground">
-                            {r.end}
-                          </div>
+                          <span className="text-muted-foreground">{r.end}</span>
                         ) : (
-                          <Input
-                            type="time"
+                          <TimeInput
                             value={r.end}
-                            onChange={(e) =>
-                              updateBlock(r.id, { end: e.target.value })
-                            }
+                            onChange={(v) => updateBlock(r.id, { end: v })}
+                            className="h-7 w-20"
                           />
                         )}
+                        <span className="text-xs text-muted-foreground/60">
+                          ({fmtHM(mins)})
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={ranges.length === 1}
+                          onClick={() => removeBlock(r.id)}
+                          aria-label="remove block"
+                          className="ml-auto"
+                        >
+                          ✕
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        disabled={ranges.length === 1}
-                        onClick={() => removeBlock(r.id)}
-                        aria-label="remove block"
-                      >
-                        ✕
-                      </Button>
                     </div>
                   );
                 })}
@@ -543,7 +566,7 @@ export default function PreviewPage() {
               {Object.entries(leaveByType).map(([t, m]) => (
                 <Readout
                   key={t}
-                  k={`${t} leave`}
+                  k={CODE_BY_VALUE[t] ?? t}
                   v={`−${fmtHM(m)}`}
                   cls="text-red-600 dark:text-red-400"
                 />
@@ -576,7 +599,7 @@ export default function PreviewPage() {
                 <TableHead>type</TableHead>
                 <TableHead>start</TableHead>
                 <TableHead>lunch</TableHead>
-                <TableHead>end</TableHead>
+                <TableHead>finish</TableHead>
                 <TableHead className="text-right">flex</TableHead>
               </TableRow>
             </TableHeader>
@@ -600,15 +623,23 @@ export default function PreviewPage() {
                       {entry ? (
                         <Badge
                           variant={(TYPE_BADGE[entry.type] ?? "outline") as never}
+                          title={LABEL_BY_VALUE[entry.type] ?? entry.type}
+                          className="w-16 justify-center"
                         >
-                          {entry.type}
+                          {CODE_BY_VALUE[entry.type] ?? entry.type}
                         </Badge>
                       ) : missing ? (
-                        <span className="text-amber-600 dark:text-amber-400">
-                          missing
-                        </span>
+                        <Badge
+                          variant="outline"
+                          title="no entry logged"
+                          className="w-16 justify-center border-amber-500/50 text-amber-600 dark:text-amber-400"
+                        >
+                          MISS
+                        </Badge>
                       ) : (
-                        <span className="text-muted-foreground/40">—</span>
+                        <span className="inline-block w-16 text-center text-muted-foreground/40">
+                          —
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>{entry ? entry.start : ""}</TableCell>
@@ -649,11 +680,91 @@ export default function PreviewPage() {
           </TerminalFrame>
         )}
 
-        <p className="pb-6 text-center text-xs text-muted-foreground">
-          /preview — terminal aesthetic, mock data. toggle light/dark above.
-        </p>
+        {/* function-key bar */}
+        <div className="sticky bottom-0 -mx-4 mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-border bg-background px-4 py-1.5 text-xs sm:-mx-6 sm:px-6">
+          {FKEYS.map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => k === "F1" && setShowHelp(true)}
+              className="flex items-center gap-1"
+            >
+              <span className="bg-secondary px-1 text-secondary-foreground">
+                {k}
+              </span>
+              <span className="text-muted-foreground hover:text-foreground">
+                {label}
+              </span>
+            </button>
+          ))}
+          <span className="ml-auto text-muted-foreground/50">
+            /preview · mock data
+          </span>
+        </div>
       </div>
+
+      {/* F1 help overlay */}
+      {showHelp && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4"
+          onClick={() => setShowHelp(false)}
+        >
+          <div
+            className="w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <TerminalFrame title="mainspring — help [F1]">
+              <div className="space-y-3 text-sm">
+                <p className="text-muted-foreground">
+                  <span className="text-secondary">$</span> keyboard &amp; codes
+                </p>
+                <div className="space-y-1">
+                  <HelpRow k="F1" v="open this help" />
+                  <HelpRow k="Esc" v="close" />
+                  <HelpRow k="click a week row" v="edit that day" />
+                </div>
+                <div className="border-t border-dashed border-border pt-2">
+                  <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
+                    entry type codes
+                  </p>
+                  {BLOCK_TYPES.map((t) => (
+                    <HelpRow key={t.value} k={t.code} v={t.label} />
+                  ))}
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => setShowHelp(false)}>
+                  close [Esc]
+                </Button>
+              </div>
+            </TerminalFrame>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// Typed HH:MM text field (no native time picker — keeps the TUI feel).
+function TimeInput({
+  value,
+  onChange,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+}) {
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      placeholder="HH:MM"
+      maxLength={5}
+      value={value}
+      onChange={(e) => onChange(formatTimeTyping(e.target.value))}
+      className={className}
+    />
   );
 }
 
@@ -671,7 +782,50 @@ function Field({
       <Label className="text-xs uppercase tracking-wider text-muted-foreground">
         {label}
       </Label>
-      <Input type="time" value={value} onChange={(e) => onChange(e.target.value)} />
+      <TimeInput value={value} onChange={onChange} />
+    </div>
+  );
+}
+
+// TUI-style inline selector: all options visible as tokens, active one filled.
+function TokenSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: { value: string; code: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1 text-sm">
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            type="button"
+            key={o.value}
+            title={o.label}
+            onClick={() => onChange(o.value)}
+            className={
+              active
+                ? "bg-secondary px-1.5 py-0.5 text-secondary-foreground"
+                : "px-1.5 py-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            }
+          >
+            {active ? `[${o.code}]` : o.code}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function HelpRow({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <span className="w-32 shrink-0 text-secondary">{k}</span>
+      <span className="text-muted-foreground">{v}</span>
     </div>
   );
 }
