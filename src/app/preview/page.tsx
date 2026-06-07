@@ -94,17 +94,33 @@ function flexClass(min: number) {
   return "text-muted-foreground";
 }
 
-/* Box-drawing window chrome to sell the "terminal" feel */
+/* Box-drawing window chrome to sell the "terminal" feel.
+   A panel is a TerminalFrame with a panelId — navigable + highlightable. */
 function TerminalFrame({
   title,
   children,
+  panelId,
+  active,
 }: {
   title: string;
   children: React.ReactNode;
+  panelId?: string;
+  active?: boolean;
 }) {
   return (
-    <div className="border border-border bg-card">
-      <div className="flex items-center gap-2 border-b border-border bg-muted px-3 py-1.5 text-muted-foreground">
+    <div
+      id={panelId ? `panel-${panelId}` : undefined}
+      className={`border bg-card ${
+        active ? "border-secondary ring-1 ring-secondary/50" : "border-border"
+      }`}
+    >
+      <div
+        className={`flex items-center gap-2 border-b px-3 py-1.5 ${
+          active
+            ? "border-secondary/50 bg-secondary/10 text-foreground"
+            : "border-border bg-muted text-muted-foreground"
+        }`}
+      >
         <span className="text-red-500">●</span>
         <span className="text-yellow-500">●</span>
         <span className="text-green-500">●</span>
@@ -177,6 +193,28 @@ const TYPE_BADGE: Record<string, string> = {
 };
 
 const TABS = ["dashboard", "timesheet", "calendar", "leave", "settings"];
+const TAB_CODES: Record<string, string> = {
+  dashboard: "DSH",
+  timesheet: "TSH",
+  calendar: "CAL",
+  leave: "LVE",
+  settings: "SET",
+};
+
+// Panels per tab. `key` is the single-letter jump (chosen to not clash with the
+// tab letters d/t/c/l/s), `label` doubles as a command-line alias.
+type Panel = { id: string; key: string; label: string };
+const PANELS: Record<string, Panel[]> = {
+  dashboard: [
+    { id: "balances", key: "b", label: "balances" },
+    { id: "thisweek", key: "w", label: "thisweek" },
+    { id: "entry", key: "e", label: "entry" },
+  ],
+  timesheet: [{ id: "fortnight", key: "f", label: "fortnight" }],
+  calendar: [],
+  leave: [],
+  settings: [],
+};
 
 // Classic TUI function-key bar (only F1/F10 wired in this preview).
 const FKEYS: [string, string][] = [
@@ -244,6 +282,9 @@ export default function PreviewPage() {
   const [tab, setTab] = useState("dashboard");
   const [selectedDate, setSelectedDate] = useState(TODAY_STR); // entry defaults to today
   const [showHelp, setShowHelp] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [cmdValue, setCmdValue] = useState("");
+  const [activePanel, setActivePanel] = useState<string | null>(null);
 
   // Entry form defaults: 08:00–17:00, lunch 13:00–14:00.
   const [start, setStart] = useState("08:00");
@@ -327,6 +368,7 @@ export default function PreviewPage() {
         setSelectedDate(TODAY_STR);
         resetForm();
         setTab("dashboard");
+        setActivePanel(null);
         toast(`New entry — ${prettyDate(TODAY_STR)}`);
         break;
       case "F5":
@@ -341,22 +383,135 @@ export default function PreviewPage() {
     }
   };
 
-  // Old-school keyboard nav: function keys fire actions, Esc closes overlays.
+  const goTab = (t: string) => {
+    setTab(t);
+    setActivePanel(null);
+  };
+  const focusPanel = (panelId: string) => {
+    setActivePanel(panelId);
+    requestAnimationFrame(() =>
+      document
+        .getElementById(`panel-${panelId}`)
+        ?.scrollIntoView({ block: "nearest" })
+    );
+  };
+
+  // The `/` command line: tabs (name/code/letter), panels (id/letter), actions.
+  const runCommand = (raw: string) => {
+    const cmd = raw.trim().toLowerCase();
+    setCmdOpen(false);
+    setCmdValue("");
+    if (!cmd) return;
+    const tabMatch = TABS.find(
+      (t) => t === cmd || TAB_CODES[t].toLowerCase() === cmd || t[0] === cmd
+    );
+    if (tabMatch) {
+      goTab(tabMatch);
+      return;
+    }
+    const panelMatch = (PANELS[tab] ?? []).find(
+      (p) => p.id === cmd || p.label === cmd || p.key === cmd
+    );
+    if (panelMatch) {
+      focusPanel(panelMatch.id);
+      return;
+    }
+    switch (cmd) {
+      case "save":
+        return runFkey("F2");
+      case "new":
+        return runFkey("F3");
+      case "delete":
+      case "del":
+        return runFkey("F8");
+      case "refresh":
+        return runFkey("F5");
+      case "help":
+      case "?":
+        return runFkey("F1");
+      case "quit":
+      case "q":
+        return runFkey("F10");
+      case "light":
+      case "dark":
+        return setTheme(cmd);
+      default:
+        toast(`unknown command: ${cmd}`);
+    }
+  };
+
+  // Old-school keyboard nav: function keys, "/" command line, letter tab-jumps.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const ae = document.activeElement as HTMLElement | null;
+      const typing =
+        !!ae &&
+        (ae.tagName === "INPUT" ||
+          ae.tagName === "TEXTAREA" ||
+          ae.tagName === "SELECT" ||
+          ae.isContentEditable);
+
       if (e.key === "Escape") {
         setShowHelp(false);
+        setCmdOpen(false);
+        ae?.blur();
         return;
       }
+      // Function keys work even while typing in a field.
       if (FKEYS.some(([k]) => k === e.key)) {
         e.preventDefault();
         runFkey(e.key);
+        return;
+      }
+      // Everything below only when NOT typing and the command line is closed.
+      if (typing || cmdOpen) return;
+
+      const panels = PANELS[tab] ?? [];
+
+      if (e.key === "/") {
+        e.preventDefault();
+        setCmdOpen(true);
+        return;
+      }
+      // Left/Right cycle tabs, Up/Down cycle panels within the current tab.
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        const i = TABS.indexOf(tab);
+        const next =
+          e.key === "ArrowRight"
+            ? (i + 1) % TABS.length
+            : (i - 1 + TABS.length) % TABS.length;
+        goTab(TABS[next]);
+        return;
+      }
+      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && panels.length) {
+        e.preventDefault();
+        const i = panels.findIndex((p) => p.id === activePanel);
+        const next =
+          i === -1
+            ? e.key === "ArrowDown"
+              ? 0
+              : panels.length - 1
+            : e.key === "ArrowDown"
+              ? (i + 1) % panels.length
+              : (i - 1 + panels.length) % panels.length;
+        focusPanel(panels[next].id);
+        return;
+      }
+      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const key = e.key.toLowerCase();
+        const p = panels.find((p) => p.key === key);
+        if (p) {
+          focusPanel(p.id);
+          return;
+        }
+        const t = TABS.find((tab) => tab[0] === key);
+        if (t) goTab(t);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+  }, [selectedDate, cmdOpen, tab, activePanel]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -386,14 +541,15 @@ export default function PreviewPage() {
             return (
               <button
                 key={n}
-                onClick={() => setTab(n)}
+                title={n}
+                onClick={() => goTab(n)}
                 className={
                   active
                     ? "bg-primary px-2 py-0.5 text-primary-foreground"
                     : "px-2 py-0.5 text-muted-foreground hover:text-foreground"
                 }
               >
-                {active ? `> ${n}` : n}
+                {active ? `> ${TAB_CODES[n]}` : TAB_CODES[n]}
               </button>
             );
           })}
@@ -403,36 +559,45 @@ export default function PreviewPage() {
           <>
         <Prompt>log today&apos;s hours</Prompt>
 
-        {/* dashboard balance strip — compact bordered cells */}
-        <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <div className="border border-border bg-card px-2 py-1.5">
-            <div className="uppercase text-muted-foreground">flex</div>
-            <div className={`font-bold ${flexClass(765)}`}>{fmtFlex(765)}</div>
-          </div>
-          {[
-            { k: "annual", v: "112.5h", d: "15.0d" },
-            { k: "personal", v: "48.0h", d: "6.4d" },
-            { k: "toil", v: "8.0h", d: "1.1d" },
-          ].map((b) => (
-            <div key={b.k} className="border border-border bg-card px-2 py-1.5">
-              <div
-                title={LABEL_BY_VALUE[b.k]}
-                className="uppercase text-muted-foreground"
-              >
-                {CODE_BY_VALUE[b.k] ?? b.k}
-              </div>
-              <div className="font-bold">
-                {b.v}{" "}
-                <span className="font-normal text-muted-foreground">/ {b.d}</span>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {/* this week — dashboard middle block (Mon-start, blank by default,
-            past weekdays with no entry show "missing") */}
+        {/* balances panel */}
         <TerminalFrame
-          title={`mainspring — ~/dashboard/this-week [${dayDateLabel(
+          panelId="balances"
+          active={activePanel === "balances"}
+          title="mainspring — ~/dashboard/balances"
+        >
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+            <div>
+              <div className="uppercase text-muted-foreground">flex</div>
+              <div className={`font-bold ${flexClass(765)}`}>{fmtFlex(765)}</div>
+            </div>
+            {[
+              { k: "annual", v: "112.5h", d: "15.0d" },
+              { k: "personal", v: "48.0h", d: "6.4d" },
+              { k: "toil", v: "8.0h", d: "1.1d" },
+            ].map((b) => (
+              <div key={b.k}>
+                <div
+                  title={LABEL_BY_VALUE[b.k]}
+                  className="uppercase text-muted-foreground"
+                >
+                  {CODE_BY_VALUE[b.k] ?? b.k}
+                </div>
+                <div className="font-bold">
+                  {b.v}{" "}
+                  <span className="font-normal text-muted-foreground">
+                    / {b.d}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </TerminalFrame>
+
+        {/* thisweek panel (Sun-start, blank by default, past weekdays = MISS) */}
+        <TerminalFrame
+          panelId="thisweek"
+          active={activePanel === "thisweek"}
+          title={`mainspring — ~/dashboard/thisweek [${dayDateLabel(
             WEEK_START_STR
           )} – ${dayDateLabel(THIS_WEEK[6])}]`}
         >
@@ -492,7 +657,11 @@ export default function PreviewPage() {
         </TerminalFrame>
 
         {/* entry form with live calc — on dashboard, below the week view */}
-        <TerminalFrame title={`mainspring — ~/entry/new [${selectedDate}]`}>
+        <TerminalFrame
+          panelId="entry"
+          active={activePanel === "entry"}
+          title={`mainspring — ~/entry/new [${selectedDate}]`}
+        >
           <div className="mb-4 flex flex-wrap items-baseline gap-3 border-b border-border pb-3">
             <span className="uppercase text-muted-foreground">
               entry for
@@ -627,7 +796,11 @@ export default function PreviewPage() {
         {tab === "timesheet" && (
           <>
         {/* full fortnight timesheet — all 14 days, Thu → Wed */}
-        <TerminalFrame title={`mainspring — ~/timesheet/fortnight [${PP_LABEL}]`}>
+        <TerminalFrame
+          panelId="fortnight"
+          active={activePanel === "fortnight"}
+          title={`mainspring — ~/timesheet/fortnight [${PP_LABEL}]`}
+        >
           <Table>
             <TableHeader>
               <TableRow>
@@ -735,10 +908,34 @@ export default function PreviewPage() {
             </button>
           ))}
           <span className="ml-auto text-muted-foreground/50">
-            /preview · mock data
+            <span className="text-secondary">/</span> command · d t c l s jump
           </span>
         </div>
       </div>
+
+      {/* "/" command line — drops in over the status bar, vi-style */}
+      {cmdOpen && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-secondary bg-card">
+          <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-1.5 text-sm sm:px-6">
+            <span className="text-secondary">/</span>
+            <input
+              autoFocus
+              value={cmdValue}
+              onChange={(e) => setCmdValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") runCommand(cmdValue);
+                else if (e.key === "Escape") {
+                  setCmdOpen(false);
+                  setCmdValue("");
+                }
+              }}
+              placeholder="dsh tsh cal lve set · save new delete refresh · light dark · help"
+              className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground/40"
+            />
+            <span className="text-muted-foreground/60">⏎ run · esc cancel</span>
+          </div>
+        </div>
+      )}
 
       {/* F1 help overlay */}
       {showHelp && (
@@ -756,8 +953,13 @@ export default function PreviewPage() {
                   <span className="text-secondary">$</span> keyboard &amp; codes
                 </p>
                 <div className="space-y-1">
-                  <HelpRow k="F1" v="open this help" />
-                  <HelpRow k="Esc" v="close" />
+                  <HelpRow k="/" v="command line (tabs, panels, actions)" />
+                  <HelpRow k="d t c l s" v="jump to tab (first letter)" />
+                  <HelpRow k="b w e f" v="jump to panel (first letter)" />
+                  <HelpRow k="← →" v="prev / next tab" />
+                  <HelpRow k="↑ ↓" v="prev / next panel" />
+                  <HelpRow k="F1..F10" v="function-key actions (see bar)" />
+                  <HelpRow k="Esc" v="close / cancel" />
                   <HelpRow k="click a week row" v="edit that day" />
                 </div>
                 <div className="border-t border-dashed border-border pt-2">
