@@ -337,6 +337,18 @@ const LABEL_BY_VALUE: Record<string, string> = Object.fromEntries(
   BLOCK_TYPES.map((t) => [t.value, t.label])
 );
 
+// Calendar view modes and the type filter (all + each entry type).
+const CAL_VIEWS = [
+  { value: "month", code: "month", label: "month grid" },
+  { value: "week", code: "week", label: "week (Sun–Sat)" },
+  { value: "pp", code: "fortnight", label: "pay fortnight (Thu–Wed)" },
+  { value: "list", code: "list", label: "list" },
+];
+const CAL_FILTERS = [
+  { value: "all", code: "all", label: "all entries" },
+  ...BLOCK_TYPES.map((t) => ({ value: t.value, code: t.code, label: t.label })),
+];
+
 type BlockRange = { id: number; type: string; start: string; end: string };
 
 // Resolve stored blocks into concrete start/end ranges tiling dayStart→dayFinish.
@@ -380,6 +392,8 @@ export default function PreviewPage() {
   const [status, setStatus] = useState("planned"); // leave approval status
   const [calYear, setCalYear] = useState(2026);
   const [calMonth, setCalMonth] = useState(5); // June (0-indexed)
+  const [calView, setCalView] = useState("month");
+  const [calFilter, setCalFilter] = useState("all");
 
   // Select a day and open the edit modal (from a row click or "e"/Enter).
   const editDay = (d: string) => {
@@ -397,6 +411,16 @@ export default function PreviewPage() {
     const d = new Date(dateStr + "T00:00:00Z");
     setCalYear(d.getUTCFullYear());
     setCalMonth(d.getUTCMonth());
+  };
+  // Prev/next steps by the active view's unit (month / week / fortnight).
+  const calStep = (dir: number) => {
+    if (calView === "month") {
+      shiftMonth(dir);
+      return;
+    }
+    const d = addDaysUTC(selectedDate, dir * (calView === "pp" ? 14 : 7));
+    setSelectedDate(d);
+    syncCalMonth(d);
   };
 
   // Entry form defaults: 08:00–17:00, lunch 13:00–14:00.
@@ -813,8 +837,12 @@ export default function PreviewPage() {
             active={activePanel === "month"}
             year={calYear}
             month={calMonth}
-            onPrev={() => shiftMonth(-1)}
-            onNext={() => shiftMonth(1)}
+            view={calView}
+            onView={setCalView}
+            filter={calFilter}
+            onFilter={setCalFilter}
+            onPrev={() => calStep(-1)}
+            onNext={() => calStep(1)}
             selectedDate={selectedDate}
             onEditDay={editDay}
           />
@@ -1376,12 +1404,16 @@ function TotalsPanel({ active }: { active: boolean }) {
   );
 }
 
-// Month calendar — colour-coded day cells, today highlighted, weekends greyed,
-// click (or arrows + e) to edit a day.
+// Calendar — month / week / pay-fortnight grids + a list view, with a type
+// filter. Colour-coded, today highlighted, click (or arrows + e) to edit.
 function CalendarPanel({
   active,
   year,
   month,
+  view,
+  onView,
+  filter,
+  onFilter,
   onPrev,
   onNext,
   selectedDate,
@@ -1390,100 +1422,225 @@ function CalendarPanel({
   active: boolean;
   year: number;
   month: number;
+  view: string;
+  onView: (v: string) => void;
+  filter: string;
+  onFilter: (v: string) => void;
   onPrev: () => void;
   onNext: () => void;
   selectedDate: string;
   onEditDay: (d: string) => void;
 }) {
-  const grid = getMonthGrid(year, month);
+  const matches = (e: MockEntry) => filter === "all" || e.type === filter;
+
+  // Derive the cells, column headers, range-dimming, and label per view.
+  let cells: string[] = [];
+  let headers = WEEKDAY_HEADERS;
+  let dimMonth: number | null = null;
+  let label = "";
+  if (view === "month") {
+    cells = getMonthGrid(year, month);
+    dimMonth = month;
+    label = monthLabel(year, month);
+  } else if (view === "week") {
+    const s = sundayStartUTC(selectedDate);
+    cells = Array.from({ length: 7 }, (_, i) => addDaysUTC(s, i));
+    label = `${dayDateLabel(cells[0])} – ${dayDateLabel(cells[6])}`;
+  } else if (view === "pp") {
+    const { start } = getPayFortnight(
+      new Date(selectedDate + "T00:00:00Z"),
+      DEFAULT_ANCHOR_DATE
+    );
+    const s = start.toISOString().slice(0, 10);
+    cells = Array.from({ length: 14 }, (_, i) => addDaysUTC(s, i));
+    headers = ["THU", "FRI", "SAT", "SUN", "MON", "TUE", "WED"];
+    label = `PP ${dayDateLabel(cells[0])} – ${dayDateLabel(cells[13])}`;
+  }
+
   const legend = BLOCK_TYPES.filter((t) => t.value !== "work");
+
   return (
     <TerminalFrame
       panelId="month"
       active={active}
-      title={`mainspring — ~/calendar/month [${monthLabel(year, month)}]`}
+      title={`mainspring — ~/calendar/${view}${
+        view === "list" ? "" : ` [${label}]`
+      }`}
     >
-      <div className="mb-2 flex items-center justify-between">
-        <Button variant="outline" size="sm" onClick={onPrev}>
-          ‹ prev
-        </Button>
-        <span className="font-bold">{monthLabel(year, month)}</span>
-        <Button variant="outline" size="sm" onClick={onNext}>
-          next ›
-        </Button>
+      {/* view + filter controls */}
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex items-center gap-2">
+          <span className="uppercase text-muted-foreground">view</span>
+          <TokenSelect value={view} options={CAL_VIEWS} onChange={onView} />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="uppercase text-muted-foreground">filter</span>
+          <TokenSelect value={filter} options={CAL_FILTERS} onChange={onFilter} />
+        </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
-        {WEEKDAY_HEADERS.map((h) => (
-          <div
-            key={h}
-            className="px-1 py-0.5 text-center uppercase text-muted-foreground"
-          >
-            {h}
-          </div>
-        ))}
-        {grid.map((date) => {
-          const d = new Date(date + "T00:00:00Z");
-          const inMonth = d.getUTCMonth() === month;
-          const weekend = isWeekendDate(date);
-          const isToday = date === TODAY_STR;
-          const isSelected = date === selectedDate && inMonth;
-          const entry = inMonth ? FORTNIGHT_ENTRIES[date] : undefined;
-          return (
-            <button
-              key={date}
-              type="button"
-              disabled={!inMonth || weekend}
-              onClick={() => onEditDay(date)}
-              className={`flex h-14 flex-col items-start gap-0.5 border p-1 text-left text-sm transition-colors ${
-                !inMonth
-                  ? "border-transparent text-muted-foreground/25"
-                  : weekend
-                    ? "border-border/40 text-muted-foreground/50"
-                    : "border-border hover:bg-muted"
-              } ${
-                isSelected
-                  ? "bg-secondary/20 ring-1 ring-secondary/60"
-                  : isToday
-                    ? "bg-secondary/10"
-                    : ""
-              }`}
+      {view !== "list" && (
+        <div className="mb-2 flex items-center justify-between">
+          <Button variant="outline" size="sm" onClick={onPrev}>
+            ‹ prev
+          </Button>
+          <span className="font-bold">{label}</span>
+          <Button variant="outline" size="sm" onClick={onNext}>
+            next ›
+          </Button>
+        </div>
+      )}
+
+      {view === "list" ? (
+        <CalList
+          filter={filter}
+          selectedDate={selectedDate}
+          onEditDay={onEditDay}
+        />
+      ) : (
+        <div className="grid grid-cols-7 gap-1">
+          {headers.map((h) => (
+            <div
+              key={h}
+              className="px-1 py-0.5 text-center uppercase text-muted-foreground"
             >
-              <span className={isToday ? "font-bold text-secondary" : ""}>
-                {d.getUTCDate()}
-              </span>
-              {entry && (
-                <span
-                  className={`mt-auto ${TYPE_COLOR[entry.type] ?? "text-foreground"}`}
-                  title={`${LABEL_BY_VALUE[entry.type] ?? entry.type}${
-                    entry.status ? ` (${entry.status})` : ""
-                  }`}
-                >
-                  {CODE_BY_VALUE[entry.type] ?? entry.type}
-                  {entry.status && entry.status !== "approved" && (
-                    <span className="text-muted-foreground">*</span>
-                  )}
+              {h}
+            </div>
+          ))}
+          {cells.map((date) => {
+            const d = new Date(date + "T00:00:00Z");
+            const inRange = dimMonth === null || d.getUTCMonth() === dimMonth;
+            const weekend = isWeekendDate(date);
+            const isToday = date === TODAY_STR;
+            const isSelected = date === selectedDate && inRange;
+            const entry = inRange ? FORTNIGHT_ENTRIES[date] : undefined;
+            const showEntry = entry && matches(entry);
+            return (
+              <button
+                key={date}
+                type="button"
+                disabled={!inRange || weekend}
+                onClick={() => onEditDay(date)}
+                className={`flex h-14 flex-col items-start gap-0.5 border p-1 text-left text-sm transition-colors ${
+                  !inRange
+                    ? "border-transparent text-muted-foreground/25"
+                    : weekend
+                      ? "border-border/40 text-muted-foreground/50"
+                      : "border-border hover:bg-muted"
+                } ${
+                  isSelected
+                    ? "bg-secondary/20 ring-1 ring-secondary/60"
+                    : isToday
+                      ? "bg-secondary/10"
+                      : ""
+                }`}
+              >
+                <span className={isToday ? "font-bold text-secondary" : ""}>
+                  {d.getUTCDate()}
                 </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+                {showEntry && (
+                  <span
+                    className={`mt-auto ${TYPE_COLOR[entry.type] ?? "text-foreground"}`}
+                    title={`${LABEL_BY_VALUE[entry.type] ?? entry.type}${
+                      entry.status ? ` (${entry.status})` : ""
+                    }`}
+                  >
+                    {CODE_BY_VALUE[entry.type] ?? entry.type}
+                    {entry.status && entry.status !== "approved" && (
+                      <span className="text-muted-foreground">*</span>
+                    )}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* legend */}
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-dashed border-border pt-2 text-muted-foreground">
-        {legend.map((t) => (
-          <span key={t.value} className="flex items-center gap-1">
-            <span className={TYPE_COLOR[t.value] ?? ""}>{t.code}</span>
-            <span>{t.label}</span>
+      {view !== "list" && (
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-dashed border-border pt-2 text-muted-foreground">
+          {legend.map((t) => (
+            <span key={t.value} className="flex items-center gap-1">
+              <span className={TYPE_COLOR[t.value] ?? ""}>{t.code}</span>
+              <span>{t.label}</span>
+            </span>
+          ))}
+          <span className="flex items-center gap-1">
+            <span>*</span>
+            <span>not yet approved</span>
           </span>
-        ))}
-        <span className="flex items-center gap-1">
-          <span>*</span>
-          <span>not yet approved</span>
-        </span>
-      </div>
+        </div>
+      )}
     </TerminalFrame>
+  );
+}
+
+// Chronological list of entries, filtered by type.
+function CalList({
+  filter,
+  selectedDate,
+  onEditDay,
+}: {
+  filter: string;
+  selectedDate: string;
+  onEditDay: (d: string) => void;
+}) {
+  const rows = Object.keys(FORTNIGHT_ENTRIES)
+    .sort()
+    .map((date) => ({ date, e: FORTNIGHT_ENTRIES[date] }))
+    .filter(({ e }) => filter === "all" || e.type === filter);
+
+  if (!rows.length) {
+    return (
+      <p className="text-muted-foreground">
+        <span className="text-secondary">$</span> no entries match this filter.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-0.5">
+      {rows.map(({ date, e }) => {
+        const f = entryFlex(e);
+        const isSelected = date === selectedDate;
+        const weekend = isWeekendDate(date);
+        return (
+          <button
+            key={date}
+            type="button"
+            disabled={weekend}
+            onClick={() => onEditDay(date)}
+            className={`flex w-full items-center gap-3 px-2 py-1 text-left text-sm transition-colors ${
+              weekend ? "cursor-default" : "hover:bg-muted"
+            } ${isSelected ? "bg-secondary/20 ring-1 ring-secondary/60" : ""}`}
+          >
+            <span className="w-[7ch] text-muted-foreground">
+              {dayDateLabel(date)}
+            </span>
+            <span className="w-[4ch] font-medium">{getDayName(date)}</span>
+            <Badge
+              variant={(TYPE_BADGE[e.type] ?? "outline") as never}
+              title={LABEL_BY_VALUE[e.type] ?? e.type}
+              className="w-16 justify-center"
+            >
+              {CODE_BY_VALUE[e.type] ?? e.type}
+            </Badge>
+            <span className={`w-20 ${flexClass(f)}`}>{fmtFlex(f)}</span>
+            {e.status && (
+              <span
+                className={
+                  e.status === "approved"
+                    ? "text-muted-foreground"
+                    : "text-amber-600 dark:text-amber-400"
+                }
+              >
+                {e.status}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
