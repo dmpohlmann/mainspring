@@ -6,26 +6,13 @@
  * the real screens. Delete this folder once the look is approved.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  getPayFortnight,
-  formatPayPeriodLabel,
-  DEFAULT_ANCHOR_DATE,
-} from "@/lib/utils/pay-fortnight";
+import { getPayFortnight, DEFAULT_ANCHOR_DATE } from "@/lib/utils/pay-fortnight";
 import { getDayName } from "@/lib/utils/format";
 import { toast } from "sonner";
 
@@ -45,7 +32,6 @@ function sundayStartUTC(dateStr: string) {
 // Reference "today" for the mock, and the REAL pay period it falls in.
 const TODAY = new Date(Date.UTC(2026, 5, 7)); // 2026-06-07 (a Sunday)
 const PP = getPayFortnight(TODAY, DEFAULT_ANCHOR_DATE);
-const PP_LABEL = formatPayPeriodLabel(PP.start, PP.end); // PP: 4 Jun – 17 Jun 2026
 
 // Current week, Sunday-start (Sun 07 Jun – Sat 13 Jun; today is the Sunday).
 const TODAY_STR = TODAY.toISOString().slice(0, 10);
@@ -165,11 +151,11 @@ type MockEntry = {
 const FORTNIGHT_ENTRIES: Record<string, MockEntry> = {
   "2026-06-04": { type: "work", start: "08:00", lstart: "12:00", lend: "12:30", end: "16:35" },
   "2026-06-09": { type: "annual", start: "—", lstart: "—", lend: "—", end: "—" },
-  "2026-06-11": { type: "toil", start: "—", lstart: "—", lend: "—", end: "—" },
+  "2026-06-11": { type: "flex", start: "—", lstart: "—", lend: "—", end: "—" },
 };
 
 function entryFlex(e: MockEntry) {
-  if (e.type === "toil") return -450; // TOIL/flex day off debits a full day
+  if (e.type === "flex") return -450; // flex day off debits a full standard day
   if (e.type !== "work") return 0; // leave / public holiday — no flex impact
   return toMin(e.end) - toMin(e.start) - (toMin(e.lend) - toMin(e.lstart)) - 450;
 }
@@ -184,27 +170,59 @@ function entryWorked(e: MockEntry) {
   return toMin(e.end) - toMin(e.start) - (toMin(e.lend) - toMin(e.lstart));
 }
 
-const fortnightFlex = Object.values(FORTNIGHT_ENTRIES).reduce(
-  (a, e) => a + entryFlex(e),
-  0
-);
+const sumWorked = (dates: string[]) =>
+  dates.reduce(
+    (a, d) => a + (FORTNIGHT_ENTRIES[d] ? entryWorked(FORTNIGHT_ENTRIES[d]) : 0),
+    0
+  );
+const sumFlex = (dates: string[]) =>
+  dates.reduce(
+    (a, d) => a + (FORTNIGHT_ENTRIES[d] ? entryFlex(FORTNIGHT_ENTRIES[d]) : 0),
+    0
+  );
 
-// Opening flex balance (start of week) and this week's running totals.
+// Opening flex balance at the start of the period.
 const OPENING_FLEX = 765; // +12h 45m
-const WEEK_WORKED = THIS_WEEK.reduce(
-  (a, d) => a + (FORTNIGHT_ENTRIES[d] ? entryWorked(FORTNIGHT_ENTRIES[d]) : 0),
-  0
-);
-const WEEK_FLEX = THIS_WEEK.reduce(
-  (a, d) => a + (FORTNIGHT_ENTRIES[d] ? entryFlex(FORTNIGHT_ENTRIES[d]) : 0),
-  0
-);
+
+// Pay fortnight split into week 1 (Thu–Wed) and week 2 (Thu–Wed).
+const WK1_DATES = FORTNIGHT_DATES.slice(0, 7);
+const WK2_DATES = FORTNIGHT_DATES.slice(7, 14);
+const WK1_WORKED = sumWorked(WK1_DATES);
+const WK1_FLEX = sumFlex(WK1_DATES);
+const WK2_WORKED = sumWorked(WK2_DATES);
+const WK2_FLEX = sumFlex(WK2_DATES);
+const PP_WORKED = WK1_WORKED + WK2_WORKED;
+const PP_FLEX = WK1_FLEX + WK2_FLEX;
+
+// Which date-set each week-style panel drives (for arrow-key day selection).
+const PANEL_WEEK_DATES: Record<string, string[]> = {
+  thisweek: THIS_WEEK,
+  week1: WK1_DATES,
+  week2: WK2_DATES,
+};
+
+// Leave taken over a date range, in minutes per type (full days = 450m).
+// Leave drawn from a balance (REC/PRS) or a public holiday — NOT flex days,
+// which are captured in the flex row.
+const leaveMinsByType = (dates: string[]): Record<string, number> =>
+  dates.reduce(
+    (acc, d) => {
+      const e = FORTNIGHT_ENTRIES[d];
+      if (e && e.type !== "work" && e.type !== "flex")
+        acc[e.type] = (acc[e.type] ?? 0) + 450;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+const WK1_LEAVE = leaveMinsByType(WK1_DATES);
+const WK2_LEAVE = leaveMinsByType(WK2_DATES);
+const PP_LEAVE_BY_TYPE = leaveMinsByType(FORTNIGHT_DATES);
 
 const TYPE_BADGE: Record<string, string> = {
   work: "outline",
   annual: "default",
   personal: "default",
-  toil: "secondary",
+  flex: "secondary",
   public_holiday: "outline",
 };
 
@@ -225,7 +243,11 @@ const PANELS: Record<string, Panel[]> = {
     { id: "thisweek", code: "dt", label: "thisweek" },
     { id: "entry", code: "ne", label: "new entry" },
   ],
-  timesheet: [{ id: "fortnight", code: "ft", label: "fortnight" }],
+  timesheet: [
+    { id: "week1", code: "w1", label: "week1" },
+    { id: "week2", code: "w2", label: "week2" },
+    { id: "totals", code: "tt", label: "totals" },
+  ],
   calendar: [],
   leave: [],
   settings: [],
@@ -270,7 +292,7 @@ const BLOCK_TYPES = [
   { value: "work", code: "WRK", label: "work" },
   { value: "personal", code: "PRS", label: "personal leave" },
   { value: "annual", code: "REC", label: "recreation (annual) leave" },
-  { value: "toil", code: "TOIL", label: "TOIL" },
+  { value: "flex", code: "FLEX", label: "flex day (TOIL)" },
   { value: "public_holiday", code: "PHOL", label: "public holiday" },
 ];
 
@@ -372,7 +394,8 @@ export default function PreviewPage() {
   const leaveByType = useMemo(() => {
     const m: Record<string, number> = {};
     for (const r of ranges) {
-      if (r.type === "work") continue;
+      // flex days spend the flex balance — they don't "fill" the standard day.
+      if (r.type === "work" || r.type === "flex") continue;
       m[r.type] = (m[r.type] ?? 0) + Math.max(0, toMin(r.end) - toMin(r.start));
     }
     return m;
@@ -512,9 +535,10 @@ export default function PreviewPage() {
       // Everything below only when NOT typing and the command line is closed.
       if (typing || cmdOpen) return;
 
-      // Contextual keys when This Week is the active panel:
-      // arrows change the selected day, Enter drops into the entry panel.
-      if (activePanel === "thisweek") {
+      // Contextual keys on any week-style panel (thisweek / week1 / week2):
+      // arrows change the selected day, Enter opens the entry panel for it.
+      const weekDates = activePanel ? PANEL_WEEK_DATES[activePanel] : undefined;
+      if (weekDates) {
         if (
           e.key === "ArrowUp" ||
           e.key === "ArrowDown" ||
@@ -522,7 +546,7 @@ export default function PreviewPage() {
           e.key === "ArrowRight"
         ) {
           e.preventDefault();
-          const sel = THIS_WEEK.filter((d) => !isWeekendDate(d));
+          const sel = weekDates.filter((d) => !isWeekendDate(d));
           const fwd = e.key === "ArrowDown" || e.key === "ArrowRight";
           const i = sel.indexOf(selectedDate);
           const next =
@@ -538,6 +562,7 @@ export default function PreviewPage() {
         }
         if (e.key === "Enter") {
           e.preventDefault();
+          goTab("dashboard");
           focusPanel("entry");
           return;
         }
@@ -611,15 +636,19 @@ export default function PreviewPage() {
           active={activePanel === "balances"}
           title="mainspring — ~/dashboard/balances"
         >
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
             <div>
-              <div className="uppercase text-muted-foreground">flex</div>
+              <div
+                title="flex / TOIL balance"
+                className="uppercase text-muted-foreground"
+              >
+                flex
+              </div>
               <div className={`font-bold ${flexClass(765)}`}>{fmtFlex(765)}</div>
             </div>
             {[
               { k: "annual", v: "112.5h", d: "15.0d" },
               { k: "personal", v: "48.0h", d: "6.4d" },
-              { k: "toil", v: "8.0h", d: "1.1d" },
             ].map((b) => (
               <div key={b.k}>
                 <div
@@ -639,101 +668,17 @@ export default function PreviewPage() {
           </div>
         </TerminalFrame>
 
-        {/* thisweek panel (Sun-start, blank by default, past weekdays = MISS) */}
-        <TerminalFrame
+        <WeekPanel
           panelId="thisweek"
           active={activePanel === "thisweek"}
           title={`mainspring — ~/dashboard/thisweek [${dayDateLabel(
             WEEK_START_STR
           )} – ${dayDateLabel(THIS_WEEK[6])}]`}
-        >
-          <div className="grid gap-6 md:grid-cols-[1fr_auto]">
-            <div className="space-y-0.5">
-              {THIS_WEEK.map((date) => {
-                const isToday = date === TODAY_STR;
-                const isSelected = date === selectedDate;
-                const weekend = isWeekendDate(date);
-                const entry = FORTNIGHT_ENTRIES[date];
-                // a past weekday with no entry = missing
-                const missing = !entry && !weekend && date < TODAY_STR;
-                const f = entry ? entryFlex(entry) : 0;
-                return (
-                  <button
-                    type="button"
-                    key={date}
-                    disabled={weekend}
-                    onClick={() => setSelectedDate(date)}
-                    className={`flex w-full items-center gap-3 px-2 py-1 text-left text-sm transition-colors ${
-                      weekend
-                        ? "cursor-default text-muted-foreground/50"
-                        : "hover:bg-muted"
-                    } ${
-                      isSelected
-                        ? "bg-secondary/20 ring-1 ring-secondary/60"
-                        : isToday
-                          ? "bg-secondary/10"
-                          : ""
-                    }`}
-                  >
-                    <span className="w-[4ch] font-medium">{getDayName(date)}</span>
-                    <span className="w-[8ch] text-muted-foreground">
-                      {dayDateLabel(date)}
-                    </span>
-                    <span className="flex flex-1 items-center gap-3">
-                      {entry ? (
-                        <>
-                          <Badge
-                            variant={(TYPE_BADGE[entry.type] ?? "outline") as never}
-                            title={LABEL_BY_VALUE[entry.type] ?? entry.type}
-                            className="w-16 justify-center"
-                          >
-                            {CODE_BY_VALUE[entry.type] ?? entry.type}
-                          </Badge>
-                          <span className={flexClass(f)}>{fmtFlex(f)}</span>
-                        </>
-                      ) : missing ? (
-                        <Badge
-                          variant="outline"
-                          title="no entry logged"
-                          className="w-16 justify-center border-amber-500/50 text-amber-600 dark:text-amber-400"
-                        >
-                          MISS
-                        </Badge>
-                      ) : (
-                        <span className="inline-block w-16 text-center text-muted-foreground/40">
-                          —
-                        </span>
-                      )}
-                    </span>
-                    {isToday ? (
-                      <span className="text-secondary">← today</span>
-                    ) : isSelected ? (
-                      <span className="text-secondary">▸ editing</span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* weekly running-balance readout (mirrors the entry live-calc) */}
-            <div className="min-w-56 space-y-2 border-l border-border pl-6">
-              <p className="uppercase text-muted-foreground">week running</p>
-              <Readout k="worked" v={fmtHM(WEEK_WORKED)} />
-              <Readout
-                k="flex (week)"
-                v={fmtFlex(WEEK_FLEX)}
-                cls={flexClass(WEEK_FLEX)}
-              />
-              <div className="my-2 border-t border-dashed border-border" />
-              <Readout k="opening" v={fmtFlex(OPENING_FLEX)} cls={flexClass(OPENING_FLEX)} />
-              <Readout
-                k="balance →"
-                v={fmtFlex(OPENING_FLEX + WEEK_FLEX)}
-                cls={flexClass(OPENING_FLEX + WEEK_FLEX)}
-              />
-            </div>
-          </div>
-        </TerminalFrame>
+          dates={THIS_WEEK}
+          opening={OPENING_FLEX}
+          selectedDate={selectedDate}
+          onSelectDay={setSelectedDate}
+        />
 
         {/* entry form with live calc — on dashboard, below the week view */}
         <TerminalFrame
@@ -874,89 +819,29 @@ export default function PreviewPage() {
 
         {tab === "timesheet" && (
           <>
-        {/* full fortnight timesheet — all 14 days, Thu → Wed */}
-        <TerminalFrame
-          panelId="fortnight"
-          active={activePanel === "fortnight"}
-          title={`mainspring — ~/timesheet/fortnight [${PP_LABEL}]`}
-        >
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>day</TableHead>
-                <TableHead>date</TableHead>
-                <TableHead>type</TableHead>
-                <TableHead>start</TableHead>
-                <TableHead>lunch</TableHead>
-                <TableHead>finish</TableHead>
-                <TableHead className="text-right">flex</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {FORTNIGHT_DATES.map((date) => {
-                const entry = FORTNIGHT_ENTRIES[date];
-                const weekend = isWeekendDate(date);
-                const isToday = date === TODAY_STR;
-                const missing = !entry && !weekend && date < TODAY_STR;
-                const f = entry ? entryFlex(entry) : 0;
-                return (
-                  <TableRow
-                    key={date}
-                    className={`${entry ? "cursor-pointer" : ""} ${
-                      weekend ? "text-muted-foreground/50" : ""
-                    } ${isToday ? "bg-secondary/10" : ""}`}
-                  >
-                    <TableCell className="font-medium">{getDayName(date)}</TableCell>
-                    <TableCell>{dayDateLabel(date)}</TableCell>
-                    <TableCell>
-                      {entry ? (
-                        <Badge
-                          variant={(TYPE_BADGE[entry.type] ?? "outline") as never}
-                          title={LABEL_BY_VALUE[entry.type] ?? entry.type}
-                          className="w-16 justify-center"
-                        >
-                          {CODE_BY_VALUE[entry.type] ?? entry.type}
-                        </Badge>
-                      ) : missing ? (
-                        <Badge
-                          variant="outline"
-                          title="no entry logged"
-                          className="w-16 justify-center border-amber-500/50 text-amber-600 dark:text-amber-400"
-                        >
-                          MISS
-                        </Badge>
-                      ) : (
-                        <span className="inline-block w-16 text-center text-muted-foreground/40">
-                          —
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>{entry ? entry.start : ""}</TableCell>
-                    <TableCell>
-                      {entry && entry.lstart !== "—"
-                        ? `${entry.lstart}–${entry.lend}`
-                        : ""}
-                    </TableCell>
-                    <TableCell>{entry ? entry.end : ""}</TableCell>
-                    <TableCell
-                      className={`text-right ${entry ? flexClass(f) : ""}`}
-                    >
-                      {entry ? fmtFlex(f) : ""}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell colSpan={6}>net flex this fortnight</TableCell>
-                <TableCell className={`text-right ${flexClass(fortnightFlex)}`}>
-                  {fmtFlex(fortnightFlex)}
-                </TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-        </TerminalFrame>
+            <WeekPanel
+              panelId="week1"
+              active={activePanel === "week1"}
+              title={`mainspring — ~/timesheet/week1 [${dayDateLabel(
+                WK1_DATES[0]
+              )} – ${dayDateLabel(WK1_DATES[6])}]`}
+              dates={WK1_DATES}
+              opening={OPENING_FLEX}
+              selectedDate={selectedDate}
+              onSelectDay={setSelectedDate}
+            />
+            <WeekPanel
+              panelId="week2"
+              active={activePanel === "week2"}
+              title={`mainspring — ~/timesheet/week2 [${dayDateLabel(
+                WK2_DATES[0]
+              )} – ${dayDateLabel(WK2_DATES[6])}]`}
+              dates={WK2_DATES}
+              opening={OPENING_FLEX + WK1_FLEX}
+              selectedDate={selectedDate}
+              onSelectDay={setSelectedDate}
+            />
+            <TotalsPanel active={activePanel === "totals"} />
           </>
         )}
 
@@ -1008,7 +893,7 @@ export default function PreviewPage() {
                   setCmdValue("");
                 }
               }}
-              placeholder="d.ne · d.dt · t.ft · dsh tsh cal lve set · save new delete · light dark"
+              placeholder="d.ne · d.dt · t.w1 · t.tt · dsh tsh cal lve set · save new · light dark"
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground/40"
             />
             <span className="text-muted-foreground/60">⏎ run · esc cancel</span>
@@ -1136,6 +1021,205 @@ function TokenSelect({
         );
       })}
     </div>
+  );
+}
+
+// A week of day rows + a weekly running-balance readout. Shared by the
+// dashboard thisweek panel and the two timesheet pay-week panels.
+function WeekPanel({
+  panelId,
+  active,
+  title,
+  dates,
+  opening,
+  selectedDate,
+  onSelectDay,
+}: {
+  panelId: string;
+  active: boolean;
+  title: string;
+  dates: string[];
+  opening: number;
+  selectedDate: string;
+  onSelectDay: (d: string) => void;
+}) {
+  const worked = sumWorked(dates);
+  const flex = sumFlex(dates);
+  return (
+    <TerminalFrame panelId={panelId} active={active} title={title}>
+      <div className="grid gap-6 md:grid-cols-[1fr_auto]">
+        <div className="space-y-0.5">
+          {dates.map((date) => {
+            const isToday = date === TODAY_STR;
+            const isSelected = date === selectedDate;
+            const weekend = isWeekendDate(date);
+            const entry = FORTNIGHT_ENTRIES[date];
+            const missing = !entry && !weekend && date < TODAY_STR;
+            const f = entry ? entryFlex(entry) : 0;
+            return (
+              <button
+                type="button"
+                key={date}
+                disabled={weekend}
+                onClick={() => onSelectDay(date)}
+                className={`flex w-full items-center gap-3 px-2 py-1 text-left text-sm transition-colors ${
+                  weekend
+                    ? "cursor-default text-muted-foreground/50"
+                    : "hover:bg-muted"
+                } ${
+                  isSelected
+                    ? "bg-secondary/20 ring-1 ring-secondary/60"
+                    : isToday
+                      ? "bg-secondary/10"
+                      : ""
+                }`}
+              >
+                <span className="w-[4ch] font-medium">{getDayName(date)}</span>
+                <span className="w-[8ch] text-muted-foreground">
+                  {dayDateLabel(date)}
+                </span>
+                <span className="flex flex-1 items-center gap-3">
+                  {entry ? (
+                    <>
+                      <Badge
+                        variant={(TYPE_BADGE[entry.type] ?? "outline") as never}
+                        title={LABEL_BY_VALUE[entry.type] ?? entry.type}
+                        className="w-16 justify-center"
+                      >
+                        {CODE_BY_VALUE[entry.type] ?? entry.type}
+                      </Badge>
+                      <span className={flexClass(f)}>{fmtFlex(f)}</span>
+                    </>
+                  ) : missing ? (
+                    <Badge
+                      variant="outline"
+                      title="no entry logged"
+                      className="w-16 justify-center border-amber-500/50 text-amber-600 dark:text-amber-400"
+                    >
+                      MISS
+                    </Badge>
+                  ) : (
+                    <span className="inline-block w-16 text-center text-muted-foreground/40">
+                      —
+                    </span>
+                  )}
+                </span>
+                {isToday ? (
+                  <span className="text-secondary">← today</span>
+                ) : isSelected ? (
+                  <span className="text-secondary">▸ editing</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="min-w-56 space-y-2 border-l border-border pl-6">
+          <p className="uppercase text-muted-foreground">week running</p>
+          <Readout k="worked" v={fmtHM(worked)} />
+          <Readout k="flex (week)" v={fmtFlex(flex)} cls={flexClass(flex)} />
+          <div className="my-2 border-t border-dashed border-border" />
+          <Readout k="opening" v={fmtFlex(opening)} cls={flexClass(opening)} />
+          <Readout
+            k="balance →"
+            v={fmtFlex(opening + flex)}
+            cls={flexClass(opening + flex)}
+          />
+        </div>
+      </div>
+    </TerminalFrame>
+  );
+}
+
+// Fortnight totals — pivoted: weeks (and the pay period) are columns, the
+// metrics (worked, flex, each leave type, running balance) are rows.
+function TotalsPanel({ active }: { active: boolean }) {
+  const cols = [
+    { key: "WK1", worked: WK1_WORKED, flex: WK1_FLEX, leave: WK1_LEAVE },
+    { key: "WK2", worked: WK2_WORKED, flex: WK2_FLEX, leave: WK2_LEAVE },
+    { key: "PP", worked: PP_WORKED, flex: PP_FLEX, leave: PP_LEAVE_BY_TYPE },
+  ];
+  // Running flex balance at the end of each column.
+  const bals = [
+    OPENING_FLEX + WK1_FLEX,
+    OPENING_FLEX + WK1_FLEX + WK2_FLEX,
+    OPENING_FLEX + PP_FLEX,
+  ];
+  const leaveTypes = BLOCK_TYPES.filter(
+    (t) => t.value !== "work" && t.value !== "flex"
+  );
+  const num = "text-right tabular-nums";
+  return (
+    <TerminalFrame
+      panelId="totals"
+      active={active}
+      title={`mainspring — ~/timesheet/totals [${dayDateLabel(
+        WK1_DATES[0]
+      )} – ${dayDateLabel(WK2_DATES[6])}]`}
+    >
+      <p className="mb-2 text-muted-foreground">
+        opening flex{" "}
+        <span className={flexClass(OPENING_FLEX)}>{fmtFlex(OPENING_FLEX)}</span>
+      </p>
+      <div className="grid grid-cols-[1fr_repeat(3,5rem)] gap-x-3 gap-y-1">
+        {/* header */}
+        <span />
+        {cols.map((c) => (
+          <span key={c.key} className={`${num} font-bold`}>
+            {c.key}
+          </span>
+        ))}
+
+        {/* worked */}
+        <span className="text-muted-foreground">worked</span>
+        {cols.map((c) => (
+          <span key={c.key} className={num}>
+            {fmtHM(c.worked)}
+          </span>
+        ))}
+
+        {/* flex */}
+        <span className="text-muted-foreground">flex</span>
+        {cols.map((c) => (
+          <span key={c.key} className={`${num} ${flexClass(c.flex)}`}>
+            {fmtFlex(c.flex)}
+          </span>
+        ))}
+
+        {/* leave taken, one row per type */}
+        {leaveTypes.map((t) => (
+          <Fragment key={t.value}>
+            <span className="text-muted-foreground" title={t.label}>
+              {t.code}
+            </span>
+            {cols.map((c) => {
+              const m = c.leave[t.value] ?? 0;
+              return (
+                <span
+                  key={c.key}
+                  className={`${num} ${m ? "" : "text-muted-foreground/40"}`}
+                >
+                  {fmtHM(m)}
+                </span>
+              );
+            })}
+          </Fragment>
+        ))}
+
+        {/* running balance */}
+        <span className="border-t border-border pt-1 font-bold">bal →</span>
+        {bals.map((b, i) => (
+          <span
+            key={i}
+            className={`${num} border-t border-border pt-1 font-bold ${flexClass(
+              b
+            )}`}
+          >
+            {fmtFlex(b)}
+          </span>
+        ))}
+      </div>
+    </TerminalFrame>
   );
 }
 
