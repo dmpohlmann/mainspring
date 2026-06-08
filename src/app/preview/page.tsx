@@ -56,6 +56,24 @@ function prettyDate(dateStr: string) {
   });
 }
 
+const WEEKDAY_HEADERS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+function monthLabel(year: number, month: number) {
+  return new Date(Date.UTC(year, month, 1)).toLocaleDateString("en-AU", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+// 42-cell (6-week) month grid, Sunday-start, as ISO date strings.
+function getMonthGrid(year: number, month: number) {
+  const firstStr = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+  const startDow = new Date(firstStr + "T00:00:00Z").getUTCDay();
+  const gridStart = addDaysUTC(firstStr, -startDow);
+  return Array.from({ length: 42 }, (_, i) => addDaysUTC(gridStart, i));
+}
+
 /* ── helpers ───────────────────────────────────────────────────────────── */
 
 function toMin(t: string) {
@@ -144,14 +162,15 @@ type MockEntry = {
   lstart: string;
   lend: string;
   end: string;
+  status?: string; // leave approval state: planned | pending | approved
 };
 
 // Mock entries keyed by ISO date. Days NOT listed are blank (or "missing" if a
 // past weekday). 05 Jun left empty on purpose to show the "missing" state.
 const FORTNIGHT_ENTRIES: Record<string, MockEntry> = {
   "2026-06-04": { type: "work", start: "08:00", lstart: "12:00", lend: "12:30", end: "16:35" },
-  "2026-06-09": { type: "annual", start: "—", lstart: "—", lend: "—", end: "—" },
-  "2026-06-11": { type: "flex", start: "—", lstart: "—", lend: "—", end: "—" },
+  "2026-06-09": { type: "annual", start: "—", lstart: "—", lend: "—", end: "—", status: "approved" },
+  "2026-06-11": { type: "flex", start: "—", lstart: "—", lend: "—", end: "—", status: "planned" },
 };
 
 function entryFlex(e: MockEntry) {
@@ -226,6 +245,15 @@ const TYPE_BADGE: Record<string, string> = {
   public_holiday: "outline",
 };
 
+// Calendar cell colour per entry type.
+const TYPE_COLOR: Record<string, string> = {
+  work: "text-foreground",
+  annual: "text-blue-500 dark:text-blue-400",
+  personal: "text-orange-500 dark:text-orange-400",
+  flex: "text-purple-500 dark:text-purple-400",
+  public_holiday: "text-green-600 dark:text-green-400",
+};
+
 const TABS = ["dashboard", "timesheet", "calendar", "leave", "settings"];
 const TAB_CODES: Record<string, string> = {
   dashboard: "DSH",
@@ -247,7 +275,7 @@ const PANELS: Record<string, Panel[]> = {
     { id: "week2", code: "w2", label: "week2" },
     { id: "totals", code: "tt", label: "totals" },
   ],
-  calendar: [],
+  calendar: [{ id: "month", code: "mo", label: "month" }],
   leave: [],
   settings: [],
 };
@@ -293,6 +321,13 @@ const BLOCK_TYPES = [
   { value: "annual", code: "REC", label: "recreation (annual) leave" },
   { value: "flex", code: "FLEX", label: "flex day (TOIL)" },
   { value: "public_holiday", code: "PHOL", label: "public holiday" },
+];
+
+// Leave approval status (for scheduling ahead). Code doubles as the token label.
+const STATUS_TYPES = [
+  { value: "planned", code: "planned", label: "planned — not yet submitted" },
+  { value: "pending", code: "pending", label: "pending approval" },
+  { value: "approved", code: "approved", label: "approved" },
 ];
 
 const CODE_BY_VALUE: Record<string, string> = Object.fromEntries(
@@ -342,11 +377,26 @@ export default function PreviewPage() {
   const [cmdValue, setCmdValue] = useState("");
   const [activePanel, setActivePanel] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false); // edit-day modal
+  const [status, setStatus] = useState("planned"); // leave approval status
+  const [calYear, setCalYear] = useState(2026);
+  const [calMonth, setCalMonth] = useState(5); // June (0-indexed)
 
   // Select a day and open the edit modal (from a row click or "e"/Enter).
   const editDay = (d: string) => {
     setSelectedDate(d);
     setEditOpen(true);
+  };
+
+  const shiftMonth = (delta: number) => {
+    const total = calYear * 12 + calMonth + delta;
+    setCalYear(Math.floor(total / 12));
+    setCalMonth(((total % 12) + 12) % 12);
+  };
+  // Keep the calendar month in sync when the selected day crosses a boundary.
+  const syncCalMonth = (dateStr: string) => {
+    const d = new Date(dateStr + "T00:00:00Z");
+    setCalYear(d.getUTCFullYear());
+    setCalMonth(d.getUTCMonth());
   };
 
   // Entry form defaults: 08:00–17:00, lunch 13:00–14:00.
@@ -448,7 +498,9 @@ export default function PreviewPage() {
 
   const goTab = (t: string) => {
     setTab(t);
-    setActivePanel(null);
+    // Single-panel tabs (e.g. calendar) auto-focus their only panel.
+    const ps = PANELS[t] ?? [];
+    setActivePanel(ps.length === 1 ? ps[0].id : null);
   };
   // Scrolling/focus happens in an effect (below) so the target panel's tab has
   // already committed to the DOM — important when jumping across tabs (/t.w1).
@@ -571,6 +623,31 @@ export default function PreviewPage() {
         }
       }
 
+      // Contextual keys on the calendar: arrows move the day (±1 / ±7, skipping
+      // weekends), e/Enter edit. Crossing a month boundary follows the grid.
+      if (activePanel === "month") {
+        const arrows: Record<string, number> = {
+          ArrowLeft: -1,
+          ArrowRight: 1,
+          ArrowUp: -7,
+          ArrowDown: 7,
+        };
+        if (e.key in arrows) {
+          e.preventDefault();
+          const step = arrows[e.key];
+          let nd = addDaysUTC(selectedDate || TODAY_STR, step);
+          while (isWeekendDate(nd)) nd = addDaysUTC(nd, step > 0 ? 1 : -1);
+          setSelectedDate(nd);
+          syncCalMonth(nd);
+          return;
+        }
+        if (e.key === "e" || e.key === "Enter") {
+          e.preventDefault();
+          setEditOpen(true);
+          return;
+        }
+      }
+
       if (e.key === "/") {
         e.preventDefault();
         setCmdOpen(true);
@@ -585,7 +662,7 @@ export default function PreviewPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, cmdOpen, tab, activePanel, editOpen]);
+  }, [selectedDate, cmdOpen, tab, activePanel, editOpen, calYear, calMonth]);
 
   // Scroll the active panel into view after the tab + panel have rendered.
   // Runs cross-tab, unlike a same-tick rAF.
@@ -731,7 +808,19 @@ export default function PreviewPage() {
           </>
         )}
 
-        {["calendar", "leave", "settings"].includes(tab) && (
+        {tab === "calendar" && (
+          <CalendarPanel
+            active={activePanel === "month"}
+            year={calYear}
+            month={calMonth}
+            onPrev={() => shiftMonth(-1)}
+            onNext={() => shiftMonth(1)}
+            selectedDate={selectedDate}
+            onEditDay={editDay}
+          />
+        )}
+
+        {["leave", "settings"].includes(tab) && (
           <TerminalFrame title={`mainspring — ~/${tab}`}>
             <p className="text-sm text-muted-foreground">
               <span className="text-secondary">$</span> {tab} view — not built in
@@ -799,7 +888,7 @@ export default function PreviewPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <TerminalFrame title={`mainspring — ~/entry/edit [${selectedDate}]`}>
-              <div className="mb-4 flex flex-wrap items-baseline gap-3 border-b border-border pb-3">
+              <div className="mb-3 flex flex-wrap items-baseline gap-3 border-b border-border pb-3">
                 <span className="uppercase text-muted-foreground">entry for</span>
                 <span className="font-bold text-secondary">
                   {prettyDate(selectedDate)}
@@ -807,6 +896,17 @@ export default function PreviewPage() {
                 {selectedDate === TODAY_STR && (
                   <Badge variant="secondary">today</Badge>
                 )}
+                {selectedDate > TODAY_STR && (
+                  <Badge variant="outline">scheduled</Badge>
+                )}
+              </div>
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <span className="uppercase text-muted-foreground">status</span>
+                <TokenSelect
+                  value={status}
+                  options={STATUS_TYPES}
+                  onChange={setStatus}
+                />
               </div>
               <div className="grid gap-6 md:grid-cols-[1fr_auto]">
                 <div className="space-y-4">
@@ -1134,6 +1234,14 @@ function WeekPanel({
                         {CODE_BY_VALUE[entry.type] ?? entry.type}
                       </Badge>
                       <span className={flexClass(f)}>{fmtFlex(f)}</span>
+                      {entry.status && entry.status !== "approved" && (
+                        <span
+                          className="text-muted-foreground"
+                          title={`status: ${entry.status}`}
+                        >
+                          ({entry.status})
+                        </span>
+                      )}
                     </>
                   ) : missing ? (
                     <Badge
@@ -1263,6 +1371,117 @@ function TotalsPanel({ active }: { active: boolean }) {
             {fmtFlex(b)}
           </span>
         ))}
+      </div>
+    </TerminalFrame>
+  );
+}
+
+// Month calendar — colour-coded day cells, today highlighted, weekends greyed,
+// click (or arrows + e) to edit a day.
+function CalendarPanel({
+  active,
+  year,
+  month,
+  onPrev,
+  onNext,
+  selectedDate,
+  onEditDay,
+}: {
+  active: boolean;
+  year: number;
+  month: number;
+  onPrev: () => void;
+  onNext: () => void;
+  selectedDate: string;
+  onEditDay: (d: string) => void;
+}) {
+  const grid = getMonthGrid(year, month);
+  const legend = BLOCK_TYPES.filter((t) => t.value !== "work");
+  return (
+    <TerminalFrame
+      panelId="month"
+      active={active}
+      title={`mainspring — ~/calendar/month [${monthLabel(year, month)}]`}
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <Button variant="outline" size="sm" onClick={onPrev}>
+          ‹ prev
+        </Button>
+        <span className="font-bold">{monthLabel(year, month)}</span>
+        <Button variant="outline" size="sm" onClick={onNext}>
+          next ›
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {WEEKDAY_HEADERS.map((h) => (
+          <div
+            key={h}
+            className="px-1 py-0.5 text-center uppercase text-muted-foreground"
+          >
+            {h}
+          </div>
+        ))}
+        {grid.map((date) => {
+          const d = new Date(date + "T00:00:00Z");
+          const inMonth = d.getUTCMonth() === month;
+          const weekend = isWeekendDate(date);
+          const isToday = date === TODAY_STR;
+          const isSelected = date === selectedDate && inMonth;
+          const entry = inMonth ? FORTNIGHT_ENTRIES[date] : undefined;
+          return (
+            <button
+              key={date}
+              type="button"
+              disabled={!inMonth || weekend}
+              onClick={() => onEditDay(date)}
+              className={`flex h-14 flex-col items-start gap-0.5 border p-1 text-left text-sm transition-colors ${
+                !inMonth
+                  ? "border-transparent text-muted-foreground/25"
+                  : weekend
+                    ? "border-border/40 text-muted-foreground/50"
+                    : "border-border hover:bg-muted"
+              } ${
+                isSelected
+                  ? "bg-secondary/20 ring-1 ring-secondary/60"
+                  : isToday
+                    ? "bg-secondary/10"
+                    : ""
+              }`}
+            >
+              <span className={isToday ? "font-bold text-secondary" : ""}>
+                {d.getUTCDate()}
+              </span>
+              {entry && (
+                <span
+                  className={`mt-auto ${TYPE_COLOR[entry.type] ?? "text-foreground"}`}
+                  title={`${LABEL_BY_VALUE[entry.type] ?? entry.type}${
+                    entry.status ? ` (${entry.status})` : ""
+                  }`}
+                >
+                  {CODE_BY_VALUE[entry.type] ?? entry.type}
+                  {entry.status && entry.status !== "approved" && (
+                    <span className="text-muted-foreground">*</span>
+                  )}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* legend */}
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-dashed border-border pt-2 text-muted-foreground">
+        {legend.map((t) => (
+          <span key={t.value} className="flex items-center gap-1">
+            <span className={TYPE_COLOR[t.value] ?? ""}>{t.code}</span>
+            <span>{t.label}</span>
+          </span>
+        ))}
+        <span className="flex items-center gap-1">
+          <span>*</span>
+          <span>not yet approved</span>
+        </span>
       </div>
     </TerminalFrame>
   );
