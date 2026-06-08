@@ -276,7 +276,11 @@ const PANELS: Record<string, Panel[]> = {
     { id: "totals", code: "tt", label: "totals" },
   ],
   calendar: [{ id: "month", code: "mo", label: "month" }],
-  leave: [],
+  leave: [
+    { id: "balances", code: "ba", label: "balances" },
+    { id: "transactions", code: "tx", label: "transactions" },
+    { id: "adjust", code: "aj", label: "adjust" },
+  ],
   settings: [],
 };
 
@@ -348,6 +352,48 @@ const CAL_FILTERS = [
   { value: "all", code: "all", label: "all entries" },
   ...BLOCK_TYPES.map((t) => ({ value: t.value, code: t.code, label: t.label })),
 ];
+
+/* ── leave management mock data ─────────────────────────────────────────── */
+
+// Australian financial year ends 30 June; project accruals to then.
+const FY_END = "2026-06-30";
+const FORTNIGHTS_TO_FY_END = Math.max(
+  0,
+  Math.floor(
+    (Date.parse(FY_END + "T00:00:00Z") - Date.parse(TODAY_STR + "T00:00:00Z")) /
+      (14 * 86400000)
+  )
+);
+
+// Per-type leave balance (hours) and fortnightly accrual rate.
+const LEAVE_BALANCES = [
+  { type: "annual", balanceH: 112.5, accrualFn: 5.77 },
+  { type: "personal", balanceH: 48.0, accrualFn: 2.88 },
+  { type: "flex", balanceH: 12.75, accrualFn: 0 }, // flex accrues from worked hours
+];
+
+// Transaction history (newest first).
+const LEAVE_TRANSACTIONS = [
+  { date: "2026-06-09", type: "annual", hours: -7.5, desc: "Annual leave taken" },
+  { date: "2026-06-05", type: "annual", hours: 5.77, desc: "Fortnightly accrual" },
+  { date: "2026-06-05", type: "personal", hours: 2.88, desc: "Fortnightly accrual" },
+  { date: "2026-05-22", type: "annual", hours: 5.77, desc: "Fortnightly accrual" },
+  { date: "2026-05-22", type: "personal", hours: 2.88, desc: "Fortnightly accrual" },
+  { date: "2026-04-15", type: "personal", hours: -7.5, desc: "Personal leave taken" },
+  { date: "2025-07-01", type: "annual", hours: 105.0, desc: "Opening balance" },
+  { date: "2025-07-01", type: "personal", hours: 45.0, desc: "Opening balance" },
+];
+
+const LEAVE_FILTERS = [
+  { value: "all", code: "all", label: "all types" },
+  { value: "annual", code: "REC", label: "recreation (annual) leave" },
+  { value: "personal", code: "PRS", label: "personal leave" },
+  { value: "flex", code: "FLEX", label: "flex" },
+];
+
+function hoursLabel(h: number) {
+  return `${h >= 0 ? "+" : "−"}${Math.abs(h).toFixed(2)}h`;
+}
 
 type BlockRange = { id: number; type: string; start: string; end: string };
 
@@ -848,11 +894,19 @@ export default function PreviewPage() {
           />
         )}
 
-        {["leave", "settings"].includes(tab) && (
-          <TerminalFrame title={`mainspring — ~/${tab}`}>
+        {tab === "leave" && (
+          <>
+            <LeaveBalancesPanel active={activePanel === "balances"} />
+            <LeaveTransactionsPanel active={activePanel === "transactions"} />
+            <LeaveAdjustPanel active={activePanel === "adjust"} />
+          </>
+        )}
+
+        {tab === "settings" && (
+          <TerminalFrame title="mainspring — ~/settings">
             <p className="text-sm text-muted-foreground">
-              <span className="text-secondary">$</span> {tab} view — not built in
-              this preview yet.
+              <span className="text-secondary">$</span> settings view — not built
+              in this preview yet.
             </p>
           </TerminalFrame>
         )}
@@ -1641,6 +1695,171 @@ function CalList({
         );
       })}
     </div>
+  );
+}
+
+// Leave balances: current balance (h/days), accrual rate, projected EOFY.
+function LeaveBalancesPanel({ active }: { active: boolean }) {
+  const num = "text-right tabular-nums";
+  const head = `${num} uppercase text-muted-foreground`;
+  return (
+    <TerminalFrame
+      panelId="balances"
+      active={active}
+      title="mainspring — ~/leave/balances"
+    >
+      <div className="grid grid-cols-[1fr_repeat(4,4.5rem)] gap-x-3 gap-y-1">
+        <span />
+        <span className={head}>bal h</span>
+        <span className={head}>days</span>
+        <span className={head}>accr/fn</span>
+        <span className={head}>EOFY</span>
+        {LEAVE_BALANCES.map((b) => {
+          const proj = b.accrualFn
+            ? b.balanceH + b.accrualFn * FORTNIGHTS_TO_FY_END
+            : null;
+          return (
+            <Fragment key={b.type}>
+              <span
+                className={TYPE_COLOR[b.type] ?? ""}
+                title={LABEL_BY_VALUE[b.type] ?? b.type}
+              >
+                {CODE_BY_VALUE[b.type] ?? b.type}
+              </span>
+              <span className={`${num} font-bold`}>{b.balanceH.toFixed(1)}</span>
+              <span className={num}>{(b.balanceH / 7.5).toFixed(1)}</span>
+              <span className={num}>
+                {b.accrualFn ? `+${b.accrualFn.toFixed(2)}` : "—"}
+              </span>
+              <span className={num}>{proj !== null ? proj.toFixed(1) : "—"}</span>
+            </Fragment>
+          );
+        })}
+      </div>
+      <p className="mt-3 border-t border-dashed border-border pt-2 text-muted-foreground">
+        EOFY = projected balance at 30 Jun 2026 ({FORTNIGHTS_TO_FY_END} fortnight
+        {FORTNIGHTS_TO_FY_END === 1 ? "" : "s"} of accrual left). FLEX accrues
+        from worked hours, not fortnightly.
+      </p>
+    </TerminalFrame>
+  );
+}
+
+// Leave transaction history, filterable by type.
+function LeaveTransactionsPanel({ active }: { active: boolean }) {
+  const [filter, setFilter] = useState("all");
+  const rows = LEAVE_TRANSACTIONS.filter(
+    (t) => filter === "all" || t.type === filter
+  );
+  return (
+    <TerminalFrame
+      panelId="transactions"
+      active={active}
+      title="mainspring — ~/leave/transactions"
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <span className="uppercase text-muted-foreground">filter</span>
+        <TokenSelect value={filter} options={LEAVE_FILTERS} onChange={setFilter} />
+      </div>
+      <div className="space-y-0.5">
+        {rows.map((t, i) => (
+          <div key={i} className="flex items-center gap-3 px-2 py-1 text-sm">
+            <span className="w-[10ch] text-muted-foreground">
+              {new Date(t.date + "T00:00:00Z").toLocaleDateString("en-AU", {
+                day: "2-digit",
+                month: "short",
+                year: "2-digit",
+                timeZone: "UTC",
+              })}
+            </span>
+            <Badge
+              variant={(TYPE_BADGE[t.type] ?? "outline") as never}
+              title={LABEL_BY_VALUE[t.type] ?? t.type}
+              className="w-16 justify-center"
+            >
+              {CODE_BY_VALUE[t.type] ?? t.type}
+            </Badge>
+            <span
+              className={`w-20 text-right tabular-nums ${
+                t.hours >= 0
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-red-600 dark:text-red-400"
+              }`}
+            >
+              {hoursLabel(t.hours)}
+            </span>
+            <span className="flex-1 truncate text-muted-foreground">
+              {t.desc}
+            </span>
+          </div>
+        ))}
+        {!rows.length && (
+          <p className="text-muted-foreground">
+            <span className="text-secondary">$</span> no transactions match.
+          </p>
+        )}
+      </div>
+    </TerminalFrame>
+  );
+}
+
+// Manual leave adjustment (credit/debit hours with a reason).
+function LeaveAdjustPanel({ active }: { active: boolean }) {
+  const [type, setType] = useState("annual");
+  const [hours, setHours] = useState("");
+  const [reason, setReason] = useState("");
+  const apply = () => {
+    const h = parseFloat(hours);
+    if (!Number.isFinite(h) || !reason.trim()) {
+      toast.error("enter hours (e.g. +5 or -7.5) and a reason");
+      return;
+    }
+    toast.success(
+      `${hoursLabel(h)} ${CODE_BY_VALUE[type] ?? type} — ${reason.trim()}`
+    );
+    setHours("");
+    setReason("");
+  };
+  return (
+    <TerminalFrame
+      panelId="adjust"
+      active={active}
+      title="mainspring — ~/leave/adjust"
+    >
+      <div className="space-y-3 text-sm">
+        <div className="flex items-center gap-3">
+          <span className="w-16 uppercase text-muted-foreground">type</span>
+          <TokenSelect
+            value={type}
+            options={LEAVE_FILTERS.slice(1)}
+            onChange={setType}
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="w-16 uppercase text-muted-foreground">hours</span>
+          <Input
+            value={hours}
+            onChange={(e) => setHours(e.target.value)}
+            placeholder="+5.0 or -7.5"
+            inputMode="decimal"
+            className="w-28"
+          />
+          <span className="text-muted-foreground">+ credit · − debit</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="w-16 uppercase text-muted-foreground">reason</span>
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="initial balance, correction, cash-out…"
+            className="flex-1"
+          />
+        </div>
+        <Button size="sm" onClick={apply}>
+          apply adjustment
+        </Button>
+      </div>
+    </TerminalFrame>
   );
 }
 
