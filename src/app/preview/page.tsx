@@ -241,7 +241,6 @@ const PANELS: Record<string, Panel[]> = {
   dashboard: [
     { id: "balances", code: "ba", label: "balances" },
     { id: "thisweek", code: "dt", label: "thisweek" },
-    { id: "entry", code: "ne", label: "new entry" },
   ],
   timesheet: [
     { id: "week1", code: "w1", label: "week1" },
@@ -342,6 +341,13 @@ export default function PreviewPage() {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdValue, setCmdValue] = useState("");
   const [activePanel, setActivePanel] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false); // edit-day modal
+
+  // Select a day and open the edit modal (from a row click or "e"/Enter).
+  const editDay = (d: string) => {
+    setSelectedDate(d);
+    setEditOpen(true);
+  };
 
   // Entry form defaults: 08:00–17:00, lunch 13:00–14:00.
   const [start, setStart] = useState("08:00");
@@ -425,8 +431,7 @@ export default function PreviewPage() {
       case "F3":
         setSelectedDate(TODAY_STR);
         resetForm();
-        setTab("dashboard");
-        setActivePanel(null);
+        setEditOpen(true);
         toast(`New entry — ${prettyDate(TODAY_STR)}`);
         break;
       case "F5":
@@ -445,15 +450,9 @@ export default function PreviewPage() {
     setTab(t);
     setActivePanel(null);
   };
-  const focusPanel = (panelId: string) => {
-    setActivePanel(panelId);
-    requestAnimationFrame(() => {
-      const el = document.getElementById(`panel-${panelId}`);
-      el?.scrollIntoView({ block: "nearest" });
-      // Entry panel: focus the first field so Tab cycles through them.
-      if (panelId === "entry") el?.querySelector<HTMLElement>("input")?.focus();
-    });
-  };
+  // Scrolling/focus happens in an effect (below) so the target panel's tab has
+  // already committed to the DOM — important when jumping across tabs (/t.w1).
+  const focusPanel = (panelId: string) => setActivePanel(panelId);
 
   // The `/` command line: tab.panel (d.ne), tab (t), panel (ne), or an action.
   const runCommand = (raw: string) => {
@@ -486,10 +485,14 @@ export default function PreviewPage() {
       return;
     }
     switch (cmd) {
+      case "edit":
+      case "e":
+        return setEditOpen(true);
+      case "new":
+      case "ne":
+        return runFkey("F3");
       case "save":
         return runFkey("F2");
-      case "new":
-        return runFkey("F3");
       case "delete":
       case "del":
         return runFkey("F8");
@@ -523,6 +526,7 @@ export default function PreviewPage() {
       if (e.key === "Escape") {
         setShowHelp(false);
         setCmdOpen(false);
+        setEditOpen(false);
         ae?.blur();
         return;
       }
@@ -532,11 +536,11 @@ export default function PreviewPage() {
         runFkey(e.key);
         return;
       }
-      // Everything below only when NOT typing and the command line is closed.
-      if (typing || cmdOpen) return;
+      // Everything below only when NOT typing, no command line, no modal open.
+      if (typing || cmdOpen || editOpen) return;
 
       // Contextual keys on any week-style panel (thisweek / week1 / week2):
-      // arrows change the selected day, Enter opens the entry panel for it.
+      // arrows change the selected day, e/Enter open the edit modal for it.
       const weekDates = activePanel ? PANEL_WEEK_DATES[activePanel] : undefined;
       if (weekDates) {
         if (
@@ -560,10 +564,9 @@ export default function PreviewPage() {
           setSelectedDate(sel[next]);
           return;
         }
-        if (e.key === "Enter") {
+        if (e.key === "e" || e.key === "Enter") {
           e.preventDefault();
-          goTab("dashboard");
-          focusPanel("entry");
+          setEditOpen(true);
           return;
         }
       }
@@ -582,7 +585,24 @@ export default function PreviewPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, cmdOpen, tab, activePanel]);
+  }, [selectedDate, cmdOpen, tab, activePanel, editOpen]);
+
+  // Scroll the active panel into view after the tab + panel have rendered.
+  // Runs cross-tab, unlike a same-tick rAF.
+  useEffect(() => {
+    if (!activePanel) return;
+    document
+      .getElementById(`panel-${activePanel}`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activePanel, tab]);
+
+  // Focus the first field when the edit modal opens.
+  useEffect(() => {
+    if (!editOpen) return;
+    requestAnimationFrame(() =>
+      document.querySelector<HTMLElement>("#edit-modal input")?.focus()
+    );
+  }, [editOpen]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -677,143 +697,9 @@ export default function PreviewPage() {
           dates={THIS_WEEK}
           opening={OPENING_FLEX}
           selectedDate={selectedDate}
-          onSelectDay={setSelectedDate}
+          onEditDay={editDay}
         />
 
-        {/* entry form with live calc — on dashboard, below the week view */}
-        <TerminalFrame
-          panelId="entry"
-          active={activePanel === "entry"}
-          title={`mainspring — ~/entry/new [${selectedDate}]`}
-        >
-          <div className="mb-4 flex flex-wrap items-baseline gap-3 border-b border-border pb-3">
-            <span className="uppercase text-muted-foreground">
-              entry for
-            </span>
-            <span className="font-bold text-secondary">
-              {prettyDate(selectedDate)}
-            </span>
-            {selectedDate === TODAY_STR && (
-              <Badge variant="secondary">today</Badge>
-            )}
-          </div>
-          <div className="grid gap-6 md:grid-cols-[1fr_auto]">
-            <div className="space-y-4">
-              {/* work block */}
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="start" value={start} onChange={setStart} />
-                <Field label="finish" value={end} onChange={setEnd} />
-                <Field label="lunch start" value={lstart} onChange={setLstart} />
-                <Field label="lunch end" value={lend} onChange={setLend} />
-              </div>
-
-              {/* split day — contiguous timeline of typed blocks */}
-              <div className="space-y-2 border-t border-dashed border-border pt-3">
-                <div className="flex items-center justify-between">
-                  <span className="uppercase text-muted-foreground">
-                    day timeline
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addBlock}
-                  >
-                    + split
-                  </Button>
-                </div>
-
-                {ranges.map((r, i) => {
-                  const isLast = i === ranges.length - 1;
-                  const mins = Math.max(0, toMin(r.end) - toMin(r.start));
-                  return (
-                    <div key={r.id} className="space-y-1.5 border border-border/60 p-2">
-                      <TokenSelect
-                        value={r.type}
-                        options={BLOCK_TYPES}
-                        onChange={(v) => updateBlock(r.id, { type: v })}
-                      />
-                      <div className="flex items-center gap-2 text-sm">
-                        {/* start is derived from the previous block — read-only */}
-                        <span className="text-muted-foreground">{r.start}</span>
-                        <span className="text-muted-foreground/50">→</span>
-                        {isLast ? (
-                          // last block always ends at the day finish (read-only)
-                          <span className="text-muted-foreground">{r.end}</span>
-                        ) : (
-                          <TimeInput
-                            value={r.end}
-                            onChange={(v) => updateBlock(r.id, { end: v })}
-                            className="h-7 w-20"
-                          />
-                        )}
-                        <span className="text-muted-foreground/60">
-                          ({fmtHM(mins)})
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          disabled={ranges.length === 1}
-                          onClick={() => removeBlock(r.id)}
-                          aria-label="remove block"
-                          className="ml-auto"
-                        >
-                          ✕
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-                <p className="text-muted-foreground/60">
-                  blocks tile {start}–{end} with no gaps. “+ split” carves the
-                  last block into a leave / TOIL block.
-                </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="note" className="uppercase text-muted-foreground">
-                  note
-                </Label>
-                <Input id="note" placeholder="WFH, meeting notes…" />
-              </div>
-            </div>
-
-            {/* live calc readout */}
-            <div className="min-w-56 space-y-2 border-l border-border pl-6 text-sm">
-              <p className="uppercase text-muted-foreground">
-                live calc
-              </p>
-              <Readout k="worked" v={fmtHM(worked)} />
-              <Readout k="standard" v="7h 30m" />
-              {Object.entries(leaveByType).map(([t, m]) => (
-                <Readout
-                  key={t}
-                  k={CODE_BY_VALUE[t] ?? t}
-                  v={`−${fmtHM(m)}`}
-                  cls="text-red-600 dark:text-red-400"
-                />
-              ))}
-              <div className="my-2 border-t border-dashed border-border" />
-              <Readout k="flex today" v={fmtFlex(dayFlex)} cls={flexClass(dayFlex)} />
-              <Readout k="balance →" v={fmtFlex(runningFlex)} cls={flexClass(runningFlex)} />
-            </div>
-          </div>
-          <div className="mt-6 flex items-center gap-3 text-muted-foreground">
-            <span>
-              <span className="bg-secondary px-1 text-secondary-foreground">F2</span>{" "}
-              save changes
-            </span>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="ml-auto"
-              onClick={() => runFkey("F8")}
-            >
-              delete [F8]
-            </Button>
-          </div>
-        </TerminalFrame>
           </>
         )}
 
@@ -828,7 +714,7 @@ export default function PreviewPage() {
               dates={WK1_DATES}
               opening={OPENING_FLEX}
               selectedDate={selectedDate}
-              onSelectDay={setSelectedDate}
+              onEditDay={editDay}
             />
             <WeekPanel
               panelId="week2"
@@ -839,7 +725,7 @@ export default function PreviewPage() {
               dates={WK2_DATES}
               opening={OPENING_FLEX + WK1_FLEX}
               selectedDate={selectedDate}
-              onSelectDay={setSelectedDate}
+              onEditDay={editDay}
             />
             <TotalsPanel active={activePanel === "totals"} />
           </>
@@ -893,10 +779,168 @@ export default function PreviewPage() {
                   setCmdValue("");
                 }
               }}
-              placeholder="d.ne · d.dt · t.w1 · t.tt · dsh tsh cal lve set · save new · light dark"
+              placeholder="edit · new · d.dt · t.w1 · t.tt · dsh tsh cal lve set · save · light dark"
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground/40"
             />
             <span className="text-muted-foreground/60">⏎ run · esc cancel</span>
+          </div>
+        </div>
+      )}
+
+      {/* edit-day modal — opened by clicking a row, "e"/Enter, or F3 */}
+      {editOpen && (
+        <div
+          id="edit-modal"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/70 p-4 sm:py-10"
+          onClick={() => setEditOpen(false)}
+        >
+          <div
+            className="w-full max-w-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <TerminalFrame title={`mainspring — ~/entry/edit [${selectedDate}]`}>
+              <div className="mb-4 flex flex-wrap items-baseline gap-3 border-b border-border pb-3">
+                <span className="uppercase text-muted-foreground">entry for</span>
+                <span className="font-bold text-secondary">
+                  {prettyDate(selectedDate)}
+                </span>
+                {selectedDate === TODAY_STR && (
+                  <Badge variant="secondary">today</Badge>
+                )}
+              </div>
+              <div className="grid gap-6 md:grid-cols-[1fr_auto]">
+                <div className="space-y-4">
+                  {/* work block */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field label="start" value={start} onChange={setStart} />
+                    <Field label="finish" value={end} onChange={setEnd} />
+                    <Field label="lunch start" value={lstart} onChange={setLstart} />
+                    <Field label="lunch end" value={lend} onChange={setLend} />
+                  </div>
+
+                  {/* split day — contiguous timeline of typed blocks */}
+                  <div className="space-y-2 border-t border-dashed border-border pt-3">
+                    <div className="flex items-center justify-between">
+                      <span className="uppercase text-muted-foreground">
+                        day timeline
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addBlock}
+                      >
+                        + split
+                      </Button>
+                    </div>
+
+                    {ranges.map((r, i) => {
+                      const isLast = i === ranges.length - 1;
+                      const mins = Math.max(0, toMin(r.end) - toMin(r.start));
+                      return (
+                        <div
+                          key={r.id}
+                          className="space-y-1.5 border border-border/60 p-2"
+                        >
+                          <TokenSelect
+                            value={r.type}
+                            options={BLOCK_TYPES}
+                            onChange={(v) => updateBlock(r.id, { type: v })}
+                          />
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-muted-foreground">{r.start}</span>
+                            <span className="text-muted-foreground/50">→</span>
+                            {isLast ? (
+                              <span className="text-muted-foreground">{r.end}</span>
+                            ) : (
+                              <TimeInput
+                                value={r.end}
+                                onChange={(v) => updateBlock(r.id, { end: v })}
+                                className="h-7 w-20"
+                              />
+                            )}
+                            <span className="text-muted-foreground/60">
+                              ({fmtHM(mins)})
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              disabled={ranges.length === 1}
+                              onClick={() => removeBlock(r.id)}
+                              aria-label="remove block"
+                              className="ml-auto"
+                            >
+                              ✕
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <p className="text-muted-foreground/60">
+                      blocks tile {start}–{end} with no gaps. “+ split” carves the
+                      last block into a leave / flex block.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="note" className="uppercase text-muted-foreground">
+                      note
+                    </Label>
+                    <Input id="note" placeholder="WFH, meeting notes…" />
+                  </div>
+                </div>
+
+                {/* live calc readout */}
+                <div className="min-w-56 space-y-2 border-l border-border pl-6 text-sm">
+                  <p className="uppercase text-muted-foreground">live calc</p>
+                  <Readout k="worked" v={fmtHM(worked)} />
+                  <Readout k="standard" v="7h 30m" />
+                  {Object.entries(leaveByType).map(([t, m]) => (
+                    <Readout
+                      key={t}
+                      k={CODE_BY_VALUE[t] ?? t}
+                      v={`−${fmtHM(m)}`}
+                      cls="text-red-600 dark:text-red-400"
+                    />
+                  ))}
+                  <div className="my-2 border-t border-dashed border-border" />
+                  <Readout
+                    k="flex today"
+                    v={fmtFlex(dayFlex)}
+                    cls={flexClass(dayFlex)}
+                  />
+                  <Readout
+                    k="balance →"
+                    v={fmtFlex(runningFlex)}
+                    cls={flexClass(runningFlex)}
+                  />
+                </div>
+              </div>
+              <div className="mt-6 flex items-center gap-3 text-muted-foreground">
+                <Button size="sm" onClick={() => runFkey("F2")}>
+                  save [F2]
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditOpen(false)}
+                >
+                  close [Esc]
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => {
+                    runFkey("F8");
+                    setEditOpen(false);
+                  }}
+                >
+                  delete [F8]
+                </Button>
+              </div>
+            </TerminalFrame>
           </div>
         </div>
       )}
@@ -917,12 +961,13 @@ export default function PreviewPage() {
                   <span className="text-secondary">$</span> keyboard &amp; codes
                 </p>
                 <div className="space-y-1">
-                  <HelpRow k="/tab.panel" v="jump to panel (e.g. /d.ne, /d.dt)" />
+                  <HelpRow k="/tab.panel" v="jump to panel (e.g. /d.dt, /t.w1)" />
                   <HelpRow k="/tab" v="jump to tab (e.g. /t, /timesheet)" />
                   <HelpRow k="d t c l s" v="quick tab jump (first letter)" />
-                  <HelpRow k="in thisweek: ↑ ↓" v="change selected day" />
-                  <HelpRow k="in thisweek: ⏎" v="go to entry panel" />
-                  <HelpRow k="in entry: Tab" v="next / prev field" />
+                  <HelpRow k="on a week: ↑ ↓" v="change selected day" />
+                  <HelpRow k="on a week: e / ⏎" v="edit selected day (modal)" />
+                  <HelpRow k="click a day" v="edit that day (modal)" />
+                  <HelpRow k="in modal: Tab" v="next / prev field" />
                   <HelpRow k="F1..F10" v="function-key actions (see bar)" />
                   <HelpRow k="Esc" v="close / cancel" />
                 </div>
@@ -1033,7 +1078,7 @@ function WeekPanel({
   dates,
   opening,
   selectedDate,
-  onSelectDay,
+  onEditDay,
 }: {
   panelId: string;
   active: boolean;
@@ -1041,7 +1086,7 @@ function WeekPanel({
   dates: string[];
   opening: number;
   selectedDate: string;
-  onSelectDay: (d: string) => void;
+  onEditDay: (d: string) => void;
 }) {
   const worked = sumWorked(dates);
   const flex = sumFlex(dates);
@@ -1061,7 +1106,7 @@ function WeekPanel({
                 type="button"
                 key={date}
                 disabled={weekend}
-                onClick={() => onSelectDay(date)}
+                onClick={() => onEditDay(date)}
                 className={`flex w-full items-center gap-3 px-2 py-1 text-left text-sm transition-colors ${
                   weekend
                     ? "cursor-default text-muted-foreground/50"
