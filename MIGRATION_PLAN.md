@@ -9,10 +9,11 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 
 ---
 
-## ▶ RESUME HERE — Phase 4b (next session)
+## ▶ RESUME HERE — Phase 4c (next session)
 
-**Phase 4a is done** (build + typecheck green). Shared TUI primitives are
-extracted and the **real edit modal** is wired:
+**Phase 4a + 4b done** (build + typecheck green).
+
+4a — shared TUI primitives + real edit modal:
 - `src/lib/tui/types.ts` — `TYPE_META` / `SEGMENT_TYPES` / `STATUS_TYPES` /
   `LEAVE_TYPE_SEGMENT` + `typeCode/typeLabel/typeColor/typeBorder`, all keyed on
   **DB enum values**. `src/lib/tui/format.ts` — `flexClass/toMinutes/
@@ -26,11 +27,22 @@ extracted and the **real edit modal** is wired:
   new `loadDayForEdit(date)` action (`src/lib/actions/entries.ts`). Shell wires
   F2=save / F8=delete through a `registerActions` ref; stub modal removed.
 
-**Goal of 4b onward:** port the panels from `src/app/preview/page.tsx` onto the
-route pages, replacing the `PanelStub`s, using the primitives above. Order:
-4b dashboard (balances + thisweek `WeekPanel`) · 4c timesheet (week1/week2/
-totals) · 4d calendar · 4e leave · 4f settings · 4g CSV export. Re-add the
-**contextual arrow keys** in the shell once week panels carry data.
+4b — dashboard wired to real data:
+- `src/lib/utils/today.ts` (`appToday()`, used by layout + pages).
+- `src/components/panels/week-panel.tsx` — **reusable** client `WeekPanel`
+  (reads `useShell()` for selectedDate/activePanel/openEdit; renders day rows
+  with `TypeTag`/flex/status/MISS + week-running readout). Takes `WeekDay[]`
+  (Pick of `DayEntry`), `opening` flex, `today`.
+- `src/components/panels/balances-panel.tsx` — flex + leave balances (h/days).
+- `src/app/(authenticated)/dashboard/page.tsx` — server component fetching
+  flex balance + leave balances + settings + this-week entries.
+
+**Goal of 4c onward:** keep porting panels from `src/app/preview/page.tsx` onto
+the route pages, replacing the `PanelStub`s, using the primitives above. Order:
+**4c timesheet** (reuse `WeekPanel` for week1/week2 over the pay fortnight via
+`getPayFortnight`; port `TotalsPanel`) · 4d calendar · 4e leave · 4f settings ·
+4g CSV export. Re-add the **contextual arrow keys** in the shell now that week
+panels carry data (the `PANEL_WEEK_DATES` logic from the preview).
 
 **What exists now (use these):**
 - Shell: `src/components/shell/app-shell.tsx` (chrome, keyboard, command, **stub
