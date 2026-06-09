@@ -3,9 +3,49 @@
 Goal: make the terminal-UI (`/preview`) the **real app** — port it onto the
 authenticated routes, persist to Supabase, and deploy.
 
-Status: **Phase 1 done** (schema + types). The `/preview` is a complete
-mock-only prototype; the existing authenticated app + DB encode an **older
-model** and are being replaced phase by phase.
+Status: **Phases 1–3 done.** Branch `terminal-aesthetic-reskin` builds & deploys
+(Vercel green). The `/preview` is the **design reference** (still mock); the
+authenticated routes now use the new TUI shell with stub panels awaiting data.
+
+---
+
+## ▶ RESUME HERE — Phase 4a (next session)
+
+**Goal of 4a:** extract shared TUI primitives + build the **real edit modal**.
+
+**What exists now (use these):**
+- Shell: `src/components/shell/app-shell.tsx` (chrome, keyboard, command, **stub
+  edit modal**), `shell-context.tsx` (`useShell()` → selectedDate, activePanel,
+  editOpen, openEdit/closeEdit), `src/lib/shell/nav.ts` (TABS/PANELS/resolvers).
+- TUI: `src/components/tui/{terminal-frame,panel-stub}.tsx`.
+- Data layer (ready to call): `src/lib/queries/{entries,leave,settings}.ts`,
+  `src/lib/actions/{entries,leave,settings}.ts`, `src/lib/utils/{entry-calc,
+  format}.ts`.
+- **Design reference with all the panel code to port:** `src/app/preview/page.tsx`
+  (WeekPanel, TotalsPanel, CalendarPanel/CalList, leave panels, edit modal,
+  TokenSelect, TypeTag, Readout, helpers toMin/fmtFlex/flexClass/fmtHM/
+  dayDateLabel/prettyDate, STATUS_TYPES). Lift these into `src/components/tui/`
+  and `src/components/panels/` as data-driven components.
+
+**Phase 4a steps:**
+1. Move shared helpers + `TokenSelect`/`TypeTag`/`Readout` + the
+   CODE/COLOR/LABEL/BLOCK_TYPES/STATUS_TYPES maps out of the preview into
+   `src/components/tui/` + a `src/lib/tui/` (or similar). **One gotcha:** the
+   preview uses short type values (`work/annual/personal/flex/public_holiday`);
+   the **DB enum** uses `work/annual_leave/personal_leave/flex_day/public_holiday`
+   and segments add `break` (lunch). Key the maps on the **DB enum values**.
+2. Real edit modal (replace the stub in `app-shell.tsx`): on open, load the day
+   via a **server action wrapping `getDayEntry(date)`** (client can't call the
+   query directly); render the segment-timeline editor (default a single work
+   block 08:00–17:00 + lunch as a `break` 13:00–14:00 from settings when no
+   entry); status selector; live calc via `entry-calc`; save → `upsertEntry`,
+   delete → `deleteEntry`. Wire F2=save / F8=delete to the modal.
+
+**Then:** 4b dashboard · 4c timesheet · 4d calendar · 4e leave · 4f settings ·
+4g CSV export. Re-add the **contextual arrow keys** (change selected day on a
+week panel) when week panels have data — deferred from Phase 3.
+
+---
 
 Progress:
 - [x] **Phase 1 — Data model & migrations.** Clean migration set
