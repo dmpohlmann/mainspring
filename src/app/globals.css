@@ -55,92 +55,108 @@
 }
 
 :root {
-  /* Terminal aesthetic — "paper terminal" light theme */
-  --background: #f4f1e9;
-  --foreground: #1c1b18;
-  --card: #fbf9f3;
-  --card-foreground: #1c1b18;
-  --popover: #fbf9f3;
-  --popover-foreground: #1c1b18;
-  --primary: #1B3A5C;
-  --primary-foreground: #f4f1e9;
-  --secondary: #C9964C;
-  --secondary-foreground: #1c1b18;
-  --muted: #e8e3d6;
-  --muted-foreground: #6b665a;
-  --accent: #e3ddcd;
-  --accent-foreground: #1c1b18;
-  --destructive: #b3261e;
-  --border: #cabfa6;
-  --input: #cabfa6;
-  --ring: #C9964C;
+  /* DMP Light — Windows Terminal scheme */
+  --background: #f4f4f0;
+  --foreground: #404040;
+  --card: #fbfaf6;
+  --card-foreground: #404040;
+  --popover: #fbfaf6;
+  --popover-foreground: #404040;
+  --primary: #262d52; /* blue */
+  --primary-foreground: #f4f4f0;
+  --secondary: #c4872a; /* gold (bright yellow) */
+  --secondary-foreground: #1a1a2e;
+  --muted: #e8e7e0;
+  --muted-foreground: #6f6c63;
+  --accent: #e2efed; /* selection */
+  --accent-foreground: #404040;
+  --destructive: #964836; /* red */
+  --border: #d8d6cc;
+  --input: #d8d6cc;
+  --ring: #c4872a;
+  --radius: 0;
+
+  /* leave-type + semantic colours, mapped from the ANSI slots */
+  --type-rec: #262d52; /* blue */
+  --type-prs: #484b88; /* purple */
+  --type-flex: #0d695c; /* cyan */
+  --type-phol: #4c6850; /* green */
+  --c-pos: #4c6850; /* +flex (green) */
+  --c-neg: #964836; /* -flex (red) */
+  --c-miss: #855c1d; /* MISS (yellow) */
+
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0;
 
-  /* Sidebar — brand navy */
-  --sidebar: #1B3A5C;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #C9964C;
-  --sidebar-primary-foreground: #1B3A5C;
-  --sidebar-accent: #234873;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #234873;
-  --sidebar-ring: #C9964C;
-
-  /* Brand tokens */
-  --brand-navy: #1B3A5C;
-  --brand-gold: #C9964C;
-  --brand-gold-light: #D4AA6A;
-  --brand-navy-light: #C8D4E2;
-  --brand-gold-dark: #D4AA6A;
+  /* Sidebar / brand (unused in preview) */
+  --sidebar: #262d52;
+  --sidebar-foreground: #f4f4f0;
+  --sidebar-primary: #c4872a;
+  --sidebar-primary-foreground: #1a1a2e;
+  --sidebar-accent: #e2efed;
+  --sidebar-accent-foreground: #404040;
+  --sidebar-border: #d8d6cc;
+  --sidebar-ring: #c4872a;
+  --brand-navy: #262d52;
+  --brand-gold: #c4872a;
+  --brand-gold-light: #c4872a;
+  --brand-navy-light: #2d3561;
+  --brand-gold-dark: #855c1d;
 }
 
 .dark {
-  /* Terminal aesthetic — "phosphor slate" dark theme (hero) */
-  --background: #0b0e14;
-  --foreground: #cdd3c8;
-  --card: #11151d;
-  --card-foreground: #cdd3c8;
-  --popover: #11151d;
-  --popover-foreground: #cdd3c8;
-  --primary: #C8D4E2;
-  --primary-foreground: #0b0e14;
-  --secondary: #D4AA6A;
-  --secondary-foreground: #0b0e14;
-  --muted: #1a1f29;
-  --muted-foreground: #8a92a0;
-  --accent: #1a1f29;
-  --accent-foreground: #cdd3c8;
-  --destructive: #e06c63;
-  --border: #283041;
-  --input: #283041;
-  --ring: #D4AA6A;
+  /* DMP Dark — Windows Terminal scheme */
+  --background: #1a1a2e;
+  --foreground: #f4f4f0;
+  --card: #1f2442; /* selection */
+  --card-foreground: #f4f4f0;
+  --popover: #1f2442;
+  --popover-foreground: #f4f4f0;
+  --primary: #2d3561; /* blue */
+  --primary-foreground: #f4f4f0;
+  --secondary: #c4872a; /* gold */
+  --secondary-foreground: #12121f;
+  --muted: #232746;
+  --muted-foreground: #8a8a80; /* bright black */
+  --accent: #1f2442;
+  --accent-foreground: #f4f4f0;
+  --destructive: #d44134; /* bright red */
+  --border: #2c2f50;
+  --input: #2c2f50;
+  --ring: #c4872a;
+
+  /* leave-type + semantic colours — bright ANSI variants for the dark bg */
+  --type-rec: #7d829d; /* bright blue */
+  --type-prs: #9697c4; /* bright purple */
+  --type-flex: #6aada4; /* bright cyan */
+  --type-phol: #99ad9b; /* bright green */
+  --c-pos: #99ad9b; /* +flex (green) */
+  --c-neg: #d44134; /* -flex (red) */
+  --c-miss: #cdd040; /* MISS (yellow) */
+
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
 
-  /* Sidebar — dark variant */
-  --sidebar: oklch(0.17 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: #D4AA6A;
-  --sidebar-primary-foreground: oklch(0.145 0 0);
-  --sidebar-accent: oklch(0.22 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: #D4AA6A;
-
-  /* Brand tokens — dark variants */
-  --brand-navy: #C8D4E2;
-  --brand-gold: #D4AA6A;
-  --brand-gold-light: #D4AA6A;
-  --brand-navy-light: #C8D4E2;
-  --brand-gold-dark: #D4AA6A;
+  /* Sidebar / brand */
+  --sidebar: #12121f;
+  --sidebar-foreground: #f4f4f0;
+  --sidebar-primary: #c4872a;
+  --sidebar-primary-foreground: #12121f;
+  --sidebar-accent: #1f2442;
+  --sidebar-accent-foreground: #f4f4f0;
+  --sidebar-border: #2c2f50;
+  --sidebar-ring: #c4872a;
+  --brand-navy: #7d829d;
+  --brand-gold: #c4872a;
+  --brand-gold-light: #cdd040;
+  --brand-navy-light: #7d829d;
+  --brand-gold-dark: #c4872a;
 }
 
 @layer base {

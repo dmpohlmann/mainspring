@@ -1,20 +1,46 @@
-export type EntryType = "work" | "annual_leave" | "personal_leave" | "public_holiday" | "toil_day" | "other";
-export type LeaveType = "annual" | "personal" | "toil";
+export type EntryType =
+  | "work"
+  | "annual_leave"
+  | "personal_leave"
+  | "public_holiday"
+  | "flex_day"
+  | "other";
 
+// Segments additionally allow 'break' (unpaid lunch).
+export type SegmentType = "work" | "break" | EntryType;
+
+export type LeaveType = "annual" | "personal";
+
+export type LeaveStatus = "planned" | "pending" | "approved";
+
+// One row per day. Segments are the source of truth; worked/flex are cached.
 export interface TimesheetEntry {
   id: string;
   user_id: string;
   date: string;
-  start_time: string | null;
-  end_time: string | null;
-  lunch_start: string | null;
-  lunch_end: string | null;
-  worked_minutes: number;
-  toil_minutes: number;
+  entry_type: EntryType; // cached display/primary type
   note: string | null;
-  entry_type: EntryType;
+  status: LeaveStatus | null; // approval state for scheduled leave
+  worked_minutes: number; // cached, derived from segments
+  flex_minutes: number; // cached, derived from segments
   created_at: string;
   updated_at: string;
+}
+
+// A contiguous typed block within a day.
+export interface TimesheetSegment {
+  id: string;
+  entry_id: string;
+  user_id: string;
+  seq: number;
+  type: SegmentType;
+  start_time: string; // "HH:MM"
+  end_time: string; // "HH:MM"
+}
+
+// An entry plus its ordered segments (the shape the UI works with).
+export interface DayEntry extends TimesheetEntry {
+  segments: TimesheetSegment[];
 }
 
 export interface LeaveBalance {
@@ -34,7 +60,7 @@ export interface LeaveTransaction {
   date: string;
   hours: number;
   description: string;
-  linked_timesheet_entry_id: string | null;
+  linked_entry_id: string | null;
   created_at: string;
 }
 
@@ -48,6 +74,15 @@ export interface Settings {
   financial_year_start_month: number;
   pay_fortnight_anchor_date: string;
   pay_fortnight_start_day: number;
+  state: string;
+  updated_at: string;
+}
+
+export interface PublicHoliday {
+  id: string;
+  date: string;
+  name: string;
+  region: string; // 'national' or a state code
 }
 
 export interface Database {
@@ -55,12 +90,21 @@ export interface Database {
     Tables: {
       timesheet_entries: {
         Row: TimesheetEntry;
-        Insert: Omit<TimesheetEntry, "id" | "created_at" | "updated_at" | "worked_minutes" | "toil_minutes"> & {
+        Insert: Omit<
+          TimesheetEntry,
+          "id" | "created_at" | "updated_at" | "worked_minutes" | "flex_minutes"
+        > & {
           id?: string;
           worked_minutes?: number;
-          toil_minutes?: number;
+          flex_minutes?: number;
         };
         Update: Partial<Omit<TimesheetEntry, "id" | "created_at" | "updated_at">>;
+        Relationships: [];
+      };
+      timesheet_segments: {
+        Row: TimesheetSegment;
+        Insert: Omit<TimesheetSegment, "id"> & { id?: string };
+        Update: Partial<Omit<TimesheetSegment, "id">>;
         Relationships: [];
       };
       leave_balances: {
@@ -77,8 +121,14 @@ export interface Database {
       };
       settings: {
         Row: Settings;
-        Insert: Omit<Settings, "id"> & { id?: string };
-        Update: Partial<Omit<Settings, "id">>;
+        Insert: Omit<Settings, "id" | "updated_at"> & { id?: string };
+        Update: Partial<Omit<Settings, "id" | "updated_at">>;
+        Relationships: [];
+      };
+      public_holidays: {
+        Row: PublicHoliday;
+        Insert: Omit<PublicHoliday, "id"> & { id?: string };
+        Update: Partial<Omit<PublicHoliday, "id">>;
         Relationships: [];
       };
     };
@@ -86,7 +136,9 @@ export interface Database {
     Functions: Record<string, never>;
     Enums: {
       entry_type: EntryType;
+      segment_type: SegmentType;
       leave_type: LeaveType;
+      leave_status: LeaveStatus;
     };
     CompositeTypes: Record<string, never>;
   };

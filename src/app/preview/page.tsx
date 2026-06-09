@@ -93,8 +93,8 @@ function fmtFlex(min: number) {
   return `${sign}${Math.floor(a / 60)}h ${String(a % 60).padStart(2, "0")}m`;
 }
 function flexClass(min: number) {
-  if (min > 0) return "text-green-600 dark:text-green-400";
-  if (min < 0) return "text-red-600 dark:text-red-400";
+  if (min > 0) return "text-[var(--c-pos)]";
+  if (min < 0) return "text-[var(--c-neg)]";
   return "text-muted-foreground";
 }
 
@@ -237,21 +237,22 @@ const WK1_LEAVE = leaveMinsByType(WK1_DATES);
 const WK2_LEAVE = leaveMinsByType(WK2_DATES);
 const PP_LEAVE_BY_TYPE = leaveMinsByType(FORTNIGHT_DATES);
 
-const TYPE_BADGE: Record<string, string> = {
-  work: "outline",
-  annual: "default",
-  personal: "default",
-  flex: "secondary",
-  public_holiday: "outline",
-};
-
-// Calendar cell colour per entry type.
+// Single source of truth for leave-type colours — used by both the text codes
+// (calendar, legend, balances) and the TypeTag badges (week rows, lists).
+// ANSI-style hues; red is reserved for −flex and amber for MISS.
 const TYPE_COLOR: Record<string, string> = {
   work: "text-foreground",
-  annual: "text-blue-500 dark:text-blue-400",
-  personal: "text-orange-500 dark:text-orange-400",
-  flex: "text-purple-500 dark:text-purple-400",
-  public_holiday: "text-green-600 dark:text-green-400",
+  annual: "text-[var(--type-rec)]",
+  personal: "text-[var(--type-prs)]",
+  flex: "text-[var(--type-flex)]",
+  public_holiday: "text-[var(--type-phol)]",
+};
+const TYPE_BORDER: Record<string, string> = {
+  work: "border-border",
+  annual: "border-[var(--type-rec)]",
+  personal: "border-[var(--type-prs)]",
+  flex: "border-[var(--type-flex)]",
+  public_holiday: "border-[var(--type-phol)]",
 };
 
 const TABS = ["dashboard", "timesheet", "calendar", "leave", "settings"];
@@ -1083,7 +1084,7 @@ export default function PreviewPage() {
                       key={t}
                       k={CODE_BY_VALUE[t] ?? t}
                       v={`−${fmtHM(m)}`}
-                      cls="text-red-600 dark:text-red-400"
+                      cls="text-[var(--c-neg)]"
                     />
                   ))}
                   <div className="my-2 border-t border-dashed border-border" />
@@ -1308,13 +1309,7 @@ function WeekPanel({
                 <span className="flex flex-1 items-center gap-3">
                   {entry ? (
                     <>
-                      <Badge
-                        variant={(TYPE_BADGE[entry.type] ?? "outline") as never}
-                        title={LABEL_BY_VALUE[entry.type] ?? entry.type}
-                        className="w-16 justify-center"
-                      >
-                        {CODE_BY_VALUE[entry.type] ?? entry.type}
-                      </Badge>
+                      <TypeTag type={entry.type} />
                       <span className={flexClass(f)}>{fmtFlex(f)}</span>
                       {entry.status && entry.status !== "approved" && (
                         <span
@@ -1329,7 +1324,7 @@ function WeekPanel({
                     <Badge
                       variant="outline"
                       title="no entry logged"
-                      className="w-16 justify-center border-amber-500/50 text-amber-600 dark:text-amber-400"
+                      className="w-16 justify-center border-[var(--c-miss)] text-[var(--c-miss)]"
                     >
                       MISS
                     </Badge>
@@ -1672,20 +1667,14 @@ function CalList({
               {dayDateLabel(date)}
             </span>
             <span className="w-[4ch] font-medium">{getDayName(date)}</span>
-            <Badge
-              variant={(TYPE_BADGE[e.type] ?? "outline") as never}
-              title={LABEL_BY_VALUE[e.type] ?? e.type}
-              className="w-16 justify-center"
-            >
-              {CODE_BY_VALUE[e.type] ?? e.type}
-            </Badge>
+            <TypeTag type={e.type} />
             <span className={`w-20 ${flexClass(f)}`}>{fmtFlex(f)}</span>
             {e.status && (
               <span
                 className={
                   e.status === "approved"
                     ? "text-muted-foreground"
-                    : "text-amber-600 dark:text-amber-400"
+                    : "text-[var(--c-miss)]"
                 }
               >
                 {e.status}
@@ -1772,18 +1761,12 @@ function LeaveTransactionsPanel({ active }: { active: boolean }) {
                 timeZone: "UTC",
               })}
             </span>
-            <Badge
-              variant={(TYPE_BADGE[t.type] ?? "outline") as never}
-              title={LABEL_BY_VALUE[t.type] ?? t.type}
-              className="w-16 justify-center"
-            >
-              {CODE_BY_VALUE[t.type] ?? t.type}
-            </Badge>
+            <TypeTag type={t.type} />
             <span
               className={`w-20 text-right tabular-nums ${
                 t.hours >= 0
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-red-600 dark:text-red-400"
+                  ? "text-[var(--c-pos)]"
+                  : "text-[var(--c-neg)]"
               }`}
             >
               {hoursLabel(t.hours)}
@@ -1860,6 +1843,21 @@ function LeaveAdjustPanel({ active }: { active: boolean }) {
         </Button>
       </div>
     </TerminalFrame>
+  );
+}
+
+// Consistent leave-type tag — same colour everywhere it appears.
+function TypeTag({ type, className }: { type: string; className?: string }) {
+  return (
+    <Badge
+      variant="outline"
+      title={LABEL_BY_VALUE[type] ?? type}
+      className={`w-16 justify-center ${TYPE_COLOR[type] ?? "text-foreground"} ${
+        TYPE_BORDER[type] ?? "border-border"
+      } ${className ?? ""}`}
+    >
+      {CODE_BY_VALUE[type] ?? type}
+    </Badge>
   );
 }
 
