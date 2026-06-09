@@ -9,9 +9,9 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 
 ---
 
-## ▶ RESUME HERE — Phase 4d (next session)
+## ▶ RESUME HERE — Phase 4e (next session)
 
-**Phase 4a + 4b + 4c done** (build + typecheck green).
+**Phase 4a + 4b + 4c + 4d done** (build + typecheck green).
 
 4a — shared TUI primitives + real edit modal:
 - `src/lib/tui/types.ts` — `TYPE_META` / `SEGMENT_TYPES` / `STATUS_TYPES` /
@@ -50,14 +50,25 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
   now include `activePanel`/`selectedDate`. Reuse the same registration for the
   calendar grid in 4d.
 
-**Goal of 4d onward:** keep porting panels from `src/app/preview/page.tsx` onto
-the route pages, replacing the `PanelStub`s, using the primitives above. Order:
-**4d calendar** (month/week/fortnight grids + list + type filter from
-`getEntriesInRange`; port `CalendarPanel`/`CalList`; the view/filter/prev-next
-state is client — keep it in the panel; register the visible grid dates for
-arrows) · 4e leave (`LeaveBalancesPanel`/`LeaveTransactionsPanel`/
-`LeaveAdjustPanel` → `getLeaveBalances`/`getLeaveTransactions` + `adjustLeaveBalance`)
-· 4f settings · 4g CSV export.
+4d — calendar wired (**URL-driven**, so edits reflect via `router.refresh()`):
+- `src/lib/tui/calendar.ts` — `getMonthGrid`/`monthLabel`/`WEEKDAY_HEADERS`/
+  `PP_HEADERS`/`CAL_VIEWS`, `calendarView(view,cursor,anchor)→{cells,headers,
+  label,dimMonth,rangeStart,rangeEnd}`, `stepCursor(view,cursor,dir)`. Also
+  centralized `localDate()` in `pay-fortnight.ts` (timesheet now imports it).
+- `src/components/panels/calendar-panel.tsx` — month/week/pp grids + list + type
+  filter (filter is client-only/visual; view+cursor live in the **URL**). Cell
+  click → `openEdit`; registers visible non-weekend dates for arrows. Renders
+  straight from the `entries` prop — no client cache.
+- `src/app/(authenticated)/calendar/page.tsx` — server component reads
+  `searchParams {view, cursor}`, computes the view, fetches the visible range.
+
+**Goal of 4e onward:** keep porting panels from `src/app/preview/page.tsx`. Order:
+**4e leave** — port `LeaveBalancesPanel` (balances h/days, accrual/fn, EOFY
+projection — `getLeaveBalances`), `LeaveTransactionsPanel` (history + type filter
+— `getLeaveTransactions`), `LeaveAdjustPanel` (form → `adjustLeaveBalance` action;
+needs a thin server-action wrapper callable from the client). The leave tab has 3
+panels (`balances`/`transactions`/`adjust`). · 4f settings (form → `upsertSettings`)
+· 4g CSV export (FLEX not TOIL, segment-aware; reuse `csv.ts`).
 
 **What exists now (use these):**
 - Shell: `src/components/shell/app-shell.tsx` (chrome, keyboard, command, **stub

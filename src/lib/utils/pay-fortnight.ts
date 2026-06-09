@@ -77,6 +77,16 @@ export function toUTCDateString(date: Date): string {
 }
 
 /**
+ * Date carrying the given YYYY-MM-DD as LOCAL calendar components — the correct
+ * input for getPayFortnight, which reads local date parts (a UTC-built Date
+ * drifts a day in negative-offset timezones).
+ */
+export function localDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/**
  * Parse a YYYY-MM-DD string into a UTC Date.
  */
 export function parseAnchorDate(dateStr: string): Date {

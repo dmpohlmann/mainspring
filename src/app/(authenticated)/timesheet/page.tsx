@@ -9,18 +9,12 @@ import { dayDateLabel } from "@/lib/tui/format";
 import {
   DEFAULT_ANCHOR_DATE,
   getPayFortnight,
+  localDate,
   toUTCDateString,
 } from "@/lib/utils/pay-fortnight";
 import type { DayEntry } from "@/lib/types/database";
 
 const LEAVE_SEG_TYPES = ["annual_leave", "personal_leave", "public_holiday"];
-
-// Build a YYYY-MM-DD with the intended calendar components (avoids the local-tz
-// drift in getPayFortnight, which reads local date parts).
-function localDate(dateStr: string): Date {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
 
 // Aggregate worked/flex/leave-by-type over a set of dates from the fetched entries.
 function columnFor(key: string, entries: DayEntry[], dates: string[]): TotalsColumn {
