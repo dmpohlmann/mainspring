@@ -8,6 +8,8 @@ import {
   primaryType,
   leaveTakenByType,
 } from "@/lib/utils/entry-calc";
+import { getDayEntry, getFlexBalance } from "@/lib/queries/entries";
+import { getSettings } from "@/lib/queries/settings";
 import type { LeaveStatus, LeaveType, SegmentType } from "@/lib/types/database";
 
 export interface SegmentInput {
@@ -39,6 +41,49 @@ async function requireUser(supabase: DB): Promise<string> {
   const { data } = await supabase.auth.getUser();
   if (!data.user?.id) throw new Error("Not authenticated");
   return data.user.id;
+}
+
+// Everything the client-side edit modal needs to render a day, in one call.
+// (The modal can't call the server-only queries directly.)
+export interface DayEditData {
+  entry: {
+    note: string | null;
+    status: LeaveStatus | null;
+    segments: SegmentInput[];
+  } | null;
+  standardDayMinutes: number;
+  defaultLunchMinutes: number;
+  // Running flex balance with THIS day excluded, so the modal can show the
+  // projected balance as the user edits.
+  flexBalanceExcludingDay: number;
+}
+
+export async function loadDayForEdit(date: string): Promise<DayEditData> {
+  const supabase = await createClient();
+  await requireUser(supabase);
+
+  const [entry, settings, totalFlex] = await Promise.all([
+    getDayEntry(date),
+    getSettings(),
+    getFlexBalance(),
+  ]);
+
+  return {
+    entry: entry
+      ? {
+          note: entry.note,
+          status: entry.status,
+          segments: entry.segments.map((s) => ({
+            type: s.type,
+            start_time: s.start_time,
+            end_time: s.end_time,
+          })),
+        }
+      : null,
+    standardDayMinutes: settings?.standard_day_minutes ?? 450,
+    defaultLunchMinutes: settings?.default_lunch_duration_minutes ?? 60,
+    flexBalanceExcludingDay: totalFlex - (entry?.flex_minutes ?? 0),
+  };
 }
 
 export async function upsertEntry(input: EntryInput) {

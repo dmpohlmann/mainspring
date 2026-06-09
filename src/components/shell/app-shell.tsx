@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/shell/nav";
 import { TerminalFrame } from "@/components/tui/terminal-frame";
 import { ShellContextProvider } from "@/components/shell/shell-context";
+import { EditModal, type EditActions } from "@/components/shell/edit-modal";
 
 const FKEYS: [string, string][] = [
   ["F1", "Help"],
@@ -47,6 +48,14 @@ export function AppShell({
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdValue, setCmdValue] = useState("");
   const signoutRef = useRef<HTMLFormElement>(null);
+  // The open edit modal registers its save/delete here so F2/F8 reach it.
+  const editActions = useRef<EditActions | null>(null);
+  const registerEditActions = useCallback(
+    (a: EditActions | null) => {
+      editActions.current = a;
+    },
+    []
+  );
 
   const goTab = (t: Tab) => {
     const ps = PANELS[t] ?? [];
@@ -67,13 +76,13 @@ export function AppShell({
       case "F1":
         return setShowHelp(true);
       case "F2":
-        return toast.success("Saved"); // wired to the editor in Phase 4
+        return editActions.current?.save(); // no-op unless the modal is open
       case "F3":
         return openEdit(today);
       case "F5":
         return router.refresh();
       case "F8":
-        return toast.error("Deleted");
+        return editActions.current?.remove(); // no-op unless the modal is open
       case "F10":
         return signoutRef.current?.requestSubmit();
     }
@@ -289,33 +298,14 @@ export function AppShell({
           </div>
         )}
 
-        {/* edit-day modal — real editor wired in Phase 4 */}
+        {/* edit-day modal */}
         {editOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/70 p-4 sm:py-10"
-            onClick={() => setEditOpen(false)}
-          >
-            <div
-              className="w-full max-w-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <TerminalFrame title={`mainspring — ~/entry/edit [${selectedDate}]`}>
-                <p className="text-muted-foreground">
-                  <span className="text-secondary">$</span> entry editor for{" "}
-                  {selectedDate} — wired to Supabase in Phase 4.
-                </p>
-                <div className="mt-4 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setEditOpen(false)}
-                    className="border border-border px-2 py-0.5 text-muted-foreground hover:text-foreground"
-                  >
-                    close [Esc]
-                  </button>
-                </div>
-              </TerminalFrame>
-            </div>
-          </div>
+          <EditModal
+            date={selectedDate}
+            today={today}
+            onClose={() => setEditOpen(false)}
+            registerActions={registerEditActions}
+          />
         )}
 
         {/* F1 help overlay */}

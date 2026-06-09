@@ -9,9 +9,28 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 
 ---
 
-## ▶ RESUME HERE — Phase 4a (next session)
+## ▶ RESUME HERE — Phase 4b (next session)
 
-**Goal of 4a:** extract shared TUI primitives + build the **real edit modal**.
+**Phase 4a is done** (build + typecheck green). Shared TUI primitives are
+extracted and the **real edit modal** is wired:
+- `src/lib/tui/types.ts` — `TYPE_META` / `SEGMENT_TYPES` / `STATUS_TYPES` /
+  `LEAVE_TYPE_SEGMENT` + `typeCode/typeLabel/typeColor/typeBorder`, all keyed on
+  **DB enum values**. `src/lib/tui/format.ts` — `flexClass/toMinutes/
+  isCompleteTime/formatTimeTyping/dayDateLabel/prettyDate` + re-exports
+  `fmtFlex/fmtHM`.
+- `src/components/tui/{token-select,type-tag,readout,time-input}.tsx` (TimeField
+  alongside TimeInput).
+- `src/components/shell/edit-modal.tsx` — segment-timeline editor (contiguous
+  blocks, lunch = `break` segment, default 08:00–17:00 + settings-sized lunch),
+  live calc via `entry-calc`, save→`upsertEntry`, delete→`deleteEntry`. Loads via
+  new `loadDayForEdit(date)` action (`src/lib/actions/entries.ts`). Shell wires
+  F2=save / F8=delete through a `registerActions` ref; stub modal removed.
+
+**Goal of 4b onward:** port the panels from `src/app/preview/page.tsx` onto the
+route pages, replacing the `PanelStub`s, using the primitives above. Order:
+4b dashboard (balances + thisweek `WeekPanel`) · 4c timesheet (week1/week2/
+totals) · 4d calendar · 4e leave · 4f settings · 4g CSV export. Re-add the
+**contextual arrow keys** in the shell once week panels carry data.
 
 **What exists now (use these):**
 - Shell: `src/components/shell/app-shell.tsx` (chrome, keyboard, command, **stub
