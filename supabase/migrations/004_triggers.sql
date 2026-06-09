@@ -2,13 +2,18 @@
 -- written into the cached columns on save — no DB calc trigger (see D2 in
 -- MIGRATION_PLAN.md).
 
+-- search_path pinned to '' to harden against injection (advisor 0011);
+-- now() resolves from pg_catalog regardless.
 CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 CREATE TRIGGER trg_settings_updated_at
   BEFORE UPDATE ON settings
