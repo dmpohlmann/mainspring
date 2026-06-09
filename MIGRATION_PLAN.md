@@ -9,9 +9,9 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 
 ---
 
-## ▶ RESUME HERE — Phase 4c (next session)
+## ▶ RESUME HERE — Phase 4d (next session)
 
-**Phase 4a + 4b done** (build + typecheck green).
+**Phase 4a + 4b + 4c done** (build + typecheck green).
 
 4a — shared TUI primitives + real edit modal:
 - `src/lib/tui/types.ts` — `TYPE_META` / `SEGMENT_TYPES` / `STATUS_TYPES` /
@@ -37,12 +37,27 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 - `src/app/(authenticated)/dashboard/page.tsx` — server component fetching
   flex balance + leave balances + settings + this-week entries.
 
-**Goal of 4c onward:** keep porting panels from `src/app/preview/page.tsx` onto
+4c — timesheet wired + contextual arrows re-added:
+- `src/components/panels/totals-panel.tsx` — pivoted WK1/WK2/PP totals (worked/
+  flex/leave-by-type/running-balance); takes precomputed `TotalsColumn[]`.
+- `src/app/(authenticated)/timesheet/page.tsx` — server component: pay fortnight
+  via `getPayFortnight` (anchor from settings, `localDate()` avoids tz drift),
+  two `WeekPanel`s + `TotalsPanel`. `WeekPanel` now sums only its own `dates`
+  (callers may pass a wider entry set).
+- **Contextual arrow keys** done: `ShellState.registerPanelDates(panelId,dates)`
+  (ref-backed Map in the shell); `WeekPanel` registers its dates; shell keydown
+  moves `selectedDate` among the active panel's non-weekend dates (wraps). Deps
+  now include `activePanel`/`selectedDate`. Reuse the same registration for the
+  calendar grid in 4d.
+
+**Goal of 4d onward:** keep porting panels from `src/app/preview/page.tsx` onto
 the route pages, replacing the `PanelStub`s, using the primitives above. Order:
-**4c timesheet** (reuse `WeekPanel` for week1/week2 over the pay fortnight via
-`getPayFortnight`; port `TotalsPanel`) · 4d calendar · 4e leave · 4f settings ·
-4g CSV export. Re-add the **contextual arrow keys** in the shell now that week
-panels carry data (the `PANEL_WEEK_DATES` logic from the preview).
+**4d calendar** (month/week/fortnight grids + list + type filter from
+`getEntriesInRange`; port `CalendarPanel`/`CalList`; the view/filter/prev-next
+state is client — keep it in the panel; register the visible grid dates for
+arrows) · 4e leave (`LeaveBalancesPanel`/`LeaveTransactionsPanel`/
+`LeaveAdjustPanel` → `getLeaveBalances`/`getLeaveTransactions` + `adjustLeaveBalance`)
+· 4f settings · 4g CSV export.
 
 **What exists now (use these):**
 - Shell: `src/components/shell/app-shell.tsx` (chrome, keyboard, command, **stub

@@ -17,6 +17,7 @@ import {
 import { TerminalFrame } from "@/components/tui/terminal-frame";
 import { ShellContextProvider } from "@/components/shell/shell-context";
 import { EditModal, type EditActions } from "@/components/shell/edit-modal";
+import { isWeekend } from "@/lib/utils/format";
 
 const FKEYS: [string, string][] = [
   ["F1", "Help"],
@@ -56,6 +57,15 @@ export function AppShell({
     },
     []
   );
+  // Week/calendar panels register the dates they drive so arrow keys can move
+  // the selected day while that panel is active.
+  const panelDates = useRef<Map<string, string[]>>(new Map());
+  const registerPanelDates = useCallback((panelId: string, dates: string[]) => {
+    panelDates.current.set(panelId, dates);
+    return () => {
+      panelDates.current.delete(panelId);
+    };
+  }, []);
 
   const goTab = (t: Tab) => {
     const ps = PANELS[t] ?? [];
@@ -160,6 +170,32 @@ export function AppShell({
       }
       if (typing || cmdOpen || editOpen) return;
 
+      // Contextual arrows on a registered week panel: move the selected day
+      // among its non-weekend dates (wraps).
+      const weekDates = activePanel ? panelDates.current.get(activePanel) : undefined;
+      if (
+        weekDates &&
+        (e.key === "ArrowUp" ||
+          e.key === "ArrowDown" ||
+          e.key === "ArrowLeft" ||
+          e.key === "ArrowRight")
+      ) {
+        e.preventDefault();
+        const sel = weekDates.filter((d) => !isWeekend(d));
+        if (!sel.length) return;
+        const fwd = e.key === "ArrowDown" || e.key === "ArrowRight";
+        const i = sel.indexOf(selectedDate);
+        const next =
+          i === -1
+            ? fwd
+              ? 0
+              : sel.length - 1
+            : fwd
+              ? (i + 1) % sel.length
+              : (i - 1 + sel.length) % sel.length;
+        return setSelectedDate(sel[next]);
+      }
+
       if (e.key === "/") {
         e.preventDefault();
         return setCmdOpen(true);
@@ -176,7 +212,7 @@ export function AppShell({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, cmdOpen, editOpen, tab]);
+  }, [pathname, cmdOpen, editOpen, tab, activePanel, selectedDate]);
 
   // Scroll the active panel into view once it has rendered.
   useEffect(() => {
@@ -196,6 +232,7 @@ export function AppShell({
         editOpen,
         openEdit,
         closeEdit: () => setEditOpen(false),
+        registerPanelDates,
       }}
     >
       <div className="min-h-screen bg-background text-foreground">

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { TerminalFrame } from "@/components/tui/terminal-frame";
 import { TypeTag } from "@/components/tui/type-tag";
@@ -32,11 +33,22 @@ export function WeekPanel({
   opening: number; // flex balance at the start of this week
   today: string;
 }) {
-  const { selectedDate, activePanel, openEdit } = useShell();
+  const { selectedDate, activePanel, openEdit, registerPanelDates } = useShell();
   const byDate = new Map(entries.map((e) => [e.date, e]));
 
-  const worked = entries.reduce((a, e) => a + e.worked_minutes, 0);
-  const flex = entries.reduce((a, e) => a + e.flex_minutes, 0);
+  // Register the dates this panel drives so shell arrow keys can move the day.
+  const dateKey = dates.join(",");
+  useEffect(
+    () => registerPanelDates(panelId, dates),
+    // dates is stable per render-set; key on its content to avoid re-registering.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [panelId, dateKey, registerPanelDates]
+  );
+
+  // Sum only the days this panel shows, so callers can pass a wider entry set.
+  const shown = dates.map((d) => byDate.get(d)).filter(Boolean) as WeekDay[];
+  const worked = shown.reduce((a, e) => a + e.worked_minutes, 0);
+  const flex = shown.reduce((a, e) => a + e.flex_minutes, 0);
 
   return (
     <TerminalFrame

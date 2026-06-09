@@ -10,6 +10,9 @@ export interface ShellState {
   editOpen: boolean;
   openEdit: (date?: string) => void;
   closeEdit: () => void;
+  // A panel registers the ordered dates it drives so the shell's keyboard
+  // handler can move the selected day with arrow keys. Returns a cleanup fn.
+  registerPanelDates: (panelId: string, dates: string[]) => () => void;
 }
 
 const ShellCtx = createContext<ShellState | null>(null);
