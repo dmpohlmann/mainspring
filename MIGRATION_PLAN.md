@@ -9,9 +9,9 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 
 ---
 
-## ▶ RESUME HERE — Phase 4e (next session)
+## ▶ RESUME HERE — Phase 4f (next session)
 
-**Phase 4a + 4b + 4c + 4d done** (build + typecheck green).
+**Phase 4a–4e done** (build + typecheck green).
 
 4a — shared TUI primitives + real edit modal:
 - `src/lib/tui/types.ts` — `TYPE_META` / `SEGMENT_TYPES` / `STATUS_TYPES` /
@@ -62,13 +62,25 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 - `src/app/(authenticated)/calendar/page.tsx` — server component reads
   `searchParams {view, cursor}`, computes the view, fetches the visible range.
 
-**Goal of 4e onward:** keep porting panels from `src/app/preview/page.tsx`. Order:
-**4e leave** — port `LeaveBalancesPanel` (balances h/days, accrual/fn, EOFY
-projection — `getLeaveBalances`), `LeaveTransactionsPanel` (history + type filter
-— `getLeaveTransactions`), `LeaveAdjustPanel` (form → `adjustLeaveBalance` action;
-needs a thin server-action wrapper callable from the client). The leave tab has 3
-panels (`balances`/`transactions`/`adjust`). · 4f settings (form → `upsertSettings`)
-· 4g CSV export (FLEX not TOIL, segment-aware; reuse `csv.ts`).
+4e — leave tab wired (3 panels):
+- `src/components/panels/leave-balances-panel.tsx` — annual/personal/flex rows
+  (bal h, days, accr/fn, EOFY); takes precomputed `BalanceRow[]`.
+- `src/components/panels/leave-transactions-panel.tsx` — history + client type
+  filter (all/annual/personal); `getLeaveTransactions`.
+- `src/components/panels/leave-adjust-panel.tsx` — form → `adjustLeaveBalance`
+  (already a `"use server"` action, **no wrapper needed**) + `router.refresh()`.
+- `leave/page.tsx` — fetches balances/transactions/flex/settings; computes FY-end
+  (last day of month before `financial_year_start_month`) + fortnights-to-FY-end.
+
+**Goal of 4f/4g:** finish Phase 4.
+- **4f settings** — port a settings form onto `settings/page.tsx` (panel id `form`,
+  code `fm` per nav.ts) → `upsertSettings` action. Fields on `Settings`:
+  standard_day_minutes, default_lunch_duration_minutes, annual/personal leave
+  days_per_year, financial_year_start_month, pay_fortnight_anchor_date,
+  pay_fortnight_start_day, state. Client form → action → `router.refresh()`.
+- **4g CSV export** — wire export using `src/lib/utils/csv.ts` (FLEX not TOIL,
+  segment-aware columns); likely a server action returning CSV + a download, or a
+  route handler. Check `csv.ts` current columns first.
 
 **What exists now (use these):**
 - Shell: `src/components/shell/app-shell.tsx` (chrome, keyboard, command, **stub

@@ -1,23 +1,74 @@
-import { PanelStub } from "@/components/tui/panel-stub";
+import {
+  LeaveBalancesPanel,
+  type BalanceRow,
+} from "@/components/panels/leave-balances-panel";
+import { LeaveTransactionsPanel } from "@/components/panels/leave-transactions-panel";
+import { LeaveAdjustPanel } from "@/components/panels/leave-adjust-panel";
+import { getFlexBalance } from "@/lib/queries/entries";
+import { getLeaveBalances, getLeaveTransactions } from "@/lib/queries/leave";
+import { getSettings } from "@/lib/queries/settings";
+import { appToday } from "@/lib/utils/today";
+import { LEAVE_TYPE_SEGMENT } from "@/lib/tui/types";
+import type { LeaveType } from "@/lib/types/database";
 
-export default function LeavePage() {
+const MS_PER_FORTNIGHT = 14 * 86400000;
+
+export default async function LeavePage() {
+  const today = appToday();
+  const [balances, transactions, flexMinutes, settings] = await Promise.all([
+    getLeaveBalances(),
+    getLeaveTransactions(),
+    getFlexBalance(),
+    getSettings(),
+  ]);
+
+  const standardDayHours = (settings?.standard_day_minutes ?? 450) / 60;
+  const fyStartMonth = settings?.financial_year_start_month ?? 7; // 1-indexed
+
+  // Financial-year end = last day of the month before the FY start month.
+  const [ty, tm] = today.split("-").map(Number);
+  const fyEndYear = tm >= fyStartMonth ? ty + 1 : ty;
+  const fyEnd = new Date(Date.UTC(fyEndYear, fyStartMonth - 1, 0));
+  const fyEndStr = fyEnd.toISOString().slice(0, 10);
+  const fortnightsToFYEnd = Math.max(
+    0,
+    Math.floor(
+      (Date.parse(fyEndStr + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) /
+        MS_PER_FORTNIGHT
+    )
+  );
+  const fyEndLabel = fyEnd.toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+  const byType = new Map(balances.map((b) => [b.leave_type, b]));
+  const rows: BalanceRow[] = (["annual", "personal"] as LeaveType[]).map((lt) => {
+    const b = byType.get(lt);
+    const balanceH = b ? Number(b.balance_hours) : 0;
+    const accrualFn = b ? Number(b.accrual_rate_hours_per_fortnight) : 0;
+    return {
+      seg: LEAVE_TYPE_SEGMENT[lt],
+      balanceH,
+      accrualFn,
+      eofy: balanceH + accrualFn * fortnightsToFYEnd,
+    };
+  });
+  rows.push({ seg: "flex_day", balanceH: flexMinutes / 60, accrualFn: null, eofy: null });
+
   return (
     <>
-      <PanelStub
+      <LeaveBalancesPanel
         panelId="balances"
-        title="mainspring — ~/leave/balances"
-        note="leave balances"
+        rows={rows}
+        standardDayHours={standardDayHours}
+        fyEndLabel={fyEndLabel}
+        fortnightsToFYEnd={fortnightsToFYEnd}
       />
-      <PanelStub
-        panelId="transactions"
-        title="mainspring — ~/leave/transactions"
-        note="transactions"
-      />
-      <PanelStub
-        panelId="adjust"
-        title="mainspring — ~/leave/adjust"
-        note="manual adjustment"
-      />
+      <LeaveTransactionsPanel panelId="transactions" transactions={transactions} />
+      <LeaveAdjustPanel panelId="adjust" />
     </>
   );
 }
