@@ -13,7 +13,11 @@ Progress:
   TOIL dropped, `public_holidays` table + `state` setting, RLS, regenerated
   `src/lib/types/database.ts`. Old feature components now mismatch the new types
   (expected — rewritten in Phases 2–4).
-- [ ] Phase 2 — Data layer (utils tz fix, queries, server actions)
+- [x] **Phase 2 — Data layer.** `format.ts` UTC-safe; `entry-calc.ts` segment
+  engine (flex math verified); queries (`entries`/`leave`/`settings`) with
+  nested segments; server actions in `src/lib/actions/` (`upsertEntry` writes
+  entry+segments and reconciles leave-balance debits, `deleteEntry`,
+  `adjustLeaveBalance`, `processAccruals`, `upsertSettings`, `initializeBalances`).
 - [ ] Phase 3 — App shell & routing
 - [ ] Phase 4 — Port panels to real data (retire old screens)
 - [ ] Phase 5 — Auth & config
