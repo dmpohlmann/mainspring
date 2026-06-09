@@ -9,10 +9,34 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 
 ---
 
-## ▶ RESUME HERE — Phase 5 (next session)
+## ▶ RESUME HERE — Phase 6 (next session)
 
-**Phase 4a–4f done** (build + typecheck green). All five tabs now render real
-data-backed panels; `panel-stub.tsx` deleted (no longer referenced).
+**Phase 4a–4f + Phase 5 done** (build + typecheck green). All five tabs render
+real data-backed panels; `panel-stub.tsx` deleted.
+
+**Phase 5 — auth & config done:**
+- Renamed `src/middleware.ts` → `src/proxy.ts` (Next 16 `proxy` convention;
+  function `middleware`→`proxy`). `src/lib/supabase/middleware.ts` (Supabase's own
+  helper) kept as-is.
+- Deleted `src/app/preview/` and removed `/preview` from `publicPaths` in
+  `src/lib/supabase/middleware.ts`. `AUTHORISED_GITHUB_ID` gate already lives
+  there (checks `user_metadata.provider_id`/`sub`).
+- Reskinned `login` + `not-authorized` to the TUI (TerminalFrame); login shows
+  `?error` on failed callback. GitHub OAuth server action unchanged.
+- Added `.env.example` (NEXT_PUBLIC_SUPABASE_URL/ANON_KEY + AUTHORISED_GITHUB_ID).
+  `.env.local` still holds PLACEHOLDER creds so it builds locally — **Phase 6
+  swaps in the real project's creds.**
+
+**Phase 6 is provisioning (mostly outside the code) — needs the user / live
+services. Do with the user, not solo:**
+- Supabase (via the connected Supabase MCP): create project, apply the
+  `supabase/migrations` set, enable GitHub OAuth, seed `settings` + opening
+  balances (`initializeBalances`). Capture URL / anon / service-role keys.
+- GitHub OAuth app (user's account): callback URLs for localhost + prod; set
+  `AUTHORISED_GITHUB_ID` to the user's numeric GitHub id.
+- Vercel: connect repo, set env vars, configure Supabase auth redirect URLs,
+  merge `terminal-aesthetic-reskin` → `main` to deploy.
+- Then **4g CSV export** (parked) + **Phase 7** E2E verify.
 
 **4g CSV export is PARKED** — picked up in a later phase, not now. Notes for then:
 `src/lib/utils/csv.ts` is a **generic serializer** (`toCSV(headers, rows)`) with
@@ -157,7 +181,9 @@ Progress:
 - [~] Phase 4 — Port panels to real data (retire old screens). **4a–4f done**
   (all five tabs on real data, edit modal, contextual arrows, stubs deleted,
   FLEX/TOIL framing resolved). **4g CSV export parked** for a later phase.
-- [ ] Phase 5 — Auth & config
+- [x] **Phase 5 — Auth & config.** middleware→proxy (Next 16); `/preview`
+  deleted + dropped from public paths; login/not-authorized reskinned to TUI;
+  `.env.example` added; `AUTHORISED_GITHUB_ID` gate in place. Real creds = Phase 6.
 - [ ] Phase 6 — Provision & host
 - [ ] Phase 7 — Verify
 
