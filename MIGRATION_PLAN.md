@@ -9,9 +9,10 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 
 ---
 
-## ▶ RESUME HERE — Phase 4f (next session)
+## ▶ RESUME HERE — Phase 4g (next session)
 
-**Phase 4a–4e done** (build + typecheck green).
+**Phase 4a–4f done** (build + typecheck green). All five tabs now render real
+data-backed panels; `panel-stub.tsx` deleted (no longer referenced).
 
 4a — shared TUI primitives + real edit modal:
 - `src/lib/tui/types.ts` — `TYPE_META` / `SEGMENT_TYPES` / `STATUS_TYPES` /
@@ -72,15 +73,21 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 - `leave/page.tsx` — fetches balances/transactions/flex/settings; computes FY-end
   (last day of month before `financial_year_start_month`) + fortnights-to-FY-end.
 
-**Goal of 4f/4g:** finish Phase 4.
-- **4f settings** — port a settings form onto `settings/page.tsx` (panel id `form`,
-  code `fm` per nav.ts) → `upsertSettings` action. Fields on `Settings`:
-  standard_day_minutes, default_lunch_duration_minutes, annual/personal leave
-  days_per_year, financial_year_start_month, pay_fortnight_anchor_date,
-  pay_fortnight_start_day, state. Client form → action → `router.refresh()`.
+4f — settings form wired:
+- `src/components/panels/settings-panel.tsx` — client form for all 8 `Settings`
+  fields (standard day as hours→×60, lunch mins, annual/personal days, FY start
+  month, pay anchor date, pay start day via weekday `TokenSelect`, state via
+  `TokenSelect`) → `upsertSettings` + `router.refresh()`. The preview never built
+  this, so it's a from-scratch TUI form.
+- `settings/page.tsx` — server component fetching `getSettings`.
+
+**Goal of 4g:** finish Phase 4.
 - **4g CSV export** — wire export using `src/lib/utils/csv.ts` (FLEX not TOIL,
-  segment-aware columns); likely a server action returning CSV + a download, or a
-  route handler. Check `csv.ts` current columns first.
+  segment-aware columns); likely a server action returning CSV + a client
+  download (Blob), or a route handler. **Check `csv.ts`'s current columns FIRST**
+  — it may still be TOIL/old-schema-shaped and need rewriting for the segment
+  model. No CSV entry point exists in the shell yet — add a command (e.g.
+  `/export`) and/or an F-key or settings button.
 
 **What exists now (use these):**
 - Shell: `src/components/shell/app-shell.tsx` (chrome, keyboard, command, **stub
