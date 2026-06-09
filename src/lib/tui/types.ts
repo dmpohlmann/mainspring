@@ -38,7 +38,7 @@ export const TYPE_META: Record<string, TypeMeta> = {
   },
   flex_day: {
     code: "FLEX",
-    label: "flex day (TOIL)",
+    label: "flex day",
     color: "text-[var(--type-flex)]",
     border: "border-[var(--type-flex)]",
   },
