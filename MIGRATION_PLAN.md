@@ -27,15 +27,24 @@ real data-backed panels; `panel-stub.tsx` deleted.
   `.env.local` still holds PLACEHOLDER creds so it builds locally — **Phase 6
   swaps in the real project's creds.**
 
-**Phase 6 is provisioning (mostly outside the code) — needs the user / live
-services. Do with the user, not solo:**
-- Supabase (via the connected Supabase MCP): create project, apply the
-  `supabase/migrations` set, enable GitHub OAuth, seed `settings` + opening
-  balances (`initializeBalances`). Capture URL / anon / service-role keys.
-- GitHub OAuth app (user's account): callback URLs for localhost + prod; set
-  `AUTHORISED_GITHUB_ID` to the user's numeric GitHub id.
-- Vercel: connect repo, set env vars, configure Supabase auth redirect URLs,
-  merge `terminal-aesthetic-reskin` → `main` to deploy.
+**Phase 6 — DB provisioning DONE (via Supabase MCP); OAuth/Vercel/seed pending
+(need the user + live accounts):**
+- ✅ Project **`mainspring-mvp`** ref **`qqrvgkywuvexohrdinoz`**, region
+  **ap-southeast-2 (Sydney)**, org `tinoqctdmxvggrjlxzfl` (HalfBakedIdeas, free).
+  URL `https://qqrvgkywuvexohrdinoz.supabase.co`. Migrations 001–005 applied
+  (005 = search_path hardening); 6 tables + RLS; security advisor clean; gen'd
+  types match `database.ts`. `.env.local` has real URL + publishable key +
+  `AUTHORISED_GITHUB_ID=13109700` (GitHub `dmpohlmann`). Old paused Mumbai
+  `mainspring` (`cssyqitjoxcstcixlngm`) left untouched.
+- ⏳ **GitHub OAuth app** (user): callback = `https://qqrvgkywuvexohrdinoz.supabase.co/auth/v1/callback`.
+  Paste client id/secret into **Supabase dashboard → Auth → Providers → GitHub**
+  (no MCP tool for auth config). Add redirect URLs (localhost + prod) under
+  Auth → URL Configuration.
+- ⏳ **Vercel** (user): import repo, set the 3 env vars, deploy, merge
+  `terminal-aesthetic-reskin` → `main`.
+- ⏳ **Seed** settings + opening balances — only after first login (rows FK to
+  `auth.users`); use the settings form + leave-adjust, or run `initializeBalances`
+  via MCP `execute_sql` once the user's `auth.users` id exists.
 - Then **4g CSV export** (parked) + **Phase 7** E2E verify.
 
 **4g CSV export is PARKED** — picked up in a later phase, not now. Notes for then:
