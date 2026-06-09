@@ -1,26 +1,23 @@
-import { Suspense } from "react";
-import { TimesheetEntryPage } from "@/components/timesheet/timesheet-entry-page";
+import { PanelStub } from "@/components/tui/panel-stub";
 
-export default function TimesheetPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ date?: string }>;
-}) {
+export default function TimesheetPage() {
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Timesheet Entry</h2>
-      <Suspense fallback={<div className="text-muted-foreground">Loading...</div>}>
-        <TimesheetEntryPageWrapper searchParams={searchParams} />
-      </Suspense>
-    </div>
+    <>
+      <PanelStub
+        panelId="week1"
+        title="mainspring — ~/timesheet/week1"
+        note="week 1"
+      />
+      <PanelStub
+        panelId="week2"
+        title="mainspring — ~/timesheet/week2"
+        note="week 2"
+      />
+      <PanelStub
+        panelId="totals"
+        title="mainspring — ~/timesheet/totals"
+        note="fortnight totals"
+      />
+    </>
   );
-}
-
-async function TimesheetEntryPageWrapper({
-  searchParams,
-}: {
-  searchParams: Promise<{ date?: string }>;
-}) {
-  const params = await searchParams;
-  return <TimesheetEntryPage initialDate={params.date} />;
 }

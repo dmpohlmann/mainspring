@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { AppShell } from "@/components/layout/app-shell";
+import { AppShell } from "@/components/shell/app-shell";
 
 export default async function AuthenticatedLayout({
   children,
@@ -11,13 +11,14 @@ export default async function AuthenticatedLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const userData = user
-    ? {
-        email: user.email,
-        avatar_url: user.user_metadata?.avatar_url,
-        full_name: user.user_metadata?.full_name,
-      }
-    : null;
+  // Today in the app's timezone (en-CA formats as YYYY-MM-DD).
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Australia/Brisbane",
+  }).format(new Date());
 
-  return <AppShell user={userData}>{children}</AppShell>;
+  return (
+    <AppShell user={user ? { email: user.email ?? undefined } : null} today={today}>
+      {children}
+    </AppShell>
+  );
 }

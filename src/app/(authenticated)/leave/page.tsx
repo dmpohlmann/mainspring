@@ -1,28 +1,23 @@
-import { getLeaveBalances, getToilBalance } from "@/lib/queries/dashboard";
-import { createClient } from "@/lib/supabase/server";
-import { LeavePageClient } from "@/components/leave/leave-page-client";
+import { PanelStub } from "@/components/tui/panel-stub";
 
-export default async function LeavePage() {
-  const supabase = await createClient();
-
-  const [leaveBalances, toilBalance, transactionsResult] = await Promise.all([
-    getLeaveBalances(),
-    getToilBalance(),
-    supabase
-      .from("leave_transactions")
-      .select("*")
-      .order("date", { ascending: false })
-      .limit(100),
-  ]);
-
+export default function LeavePage() {
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Leave Management</h2>
-      <LeavePageClient
-        leaveBalances={leaveBalances}
-        toilBalance={toilBalance}
-        transactions={transactionsResult.data || []}
+    <>
+      <PanelStub
+        panelId="balances"
+        title="mainspring — ~/leave/balances"
+        note="leave balances"
       />
-    </div>
+      <PanelStub
+        panelId="transactions"
+        title="mainspring — ~/leave/transactions"
+        note="transactions"
+      />
+      <PanelStub
+        panelId="adjust"
+        title="mainspring — ~/leave/adjust"
+        note="manual adjustment"
+      />
+    </>
   );
 }

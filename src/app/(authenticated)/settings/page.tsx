@@ -1,21 +1,11 @@
-import { getSettings, getToilBalance, getLeaveBalances } from "@/lib/queries/dashboard";
-import { SettingsForm } from "@/components/settings/settings-form";
+import { PanelStub } from "@/components/tui/panel-stub";
 
-export default async function SettingsPage() {
-  const [settings, toilBalance, leaveBalances] = await Promise.all([
-    getSettings(),
-    getToilBalance(),
-    getLeaveBalances(),
-  ]);
-
+export default function SettingsPage() {
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Settings</h2>
-      <SettingsForm
-        settings={settings}
-        currentToilMinutes={toilBalance}
-        leaveBalances={leaveBalances}
-      />
-    </div>
+    <PanelStub
+      panelId="form"
+      title="mainspring — ~/settings"
+      note="settings"
+    />
   );
 }

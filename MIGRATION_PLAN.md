@@ -18,7 +18,14 @@ Progress:
   nested segments; server actions in `src/lib/actions/` (`upsertEntry` writes
   entry+segments and reconciles leave-balance debits, `deleteEntry`,
   `adjustLeaveBalance`, `processAccruals`, `upsertSettings`, `initializeBalances`).
-- [ ] Phase 3 — App shell & routing
+- [x] **Phase 3 — App shell & routing.** New TUI `AppShell` (top bar, tab-code
+  nav → routes, F-key bar, `/` command line, help, theme toggle, signout) as a
+  persistent client shell; `ShellContext` for cross-route selectedDate /
+  activePanel / editOpen; keyboard model (tab letters, `/tab.panel`, F-keys,
+  e/Enter) works across routes. Pages are stub panels; old screens / layout /
+  queries / actions / export routes **deleted**. **`next build` passes** — the
+  branch is deployable again. (Edit-modal real editor + contextual arrows →
+  Phase 4.)
 - [ ] Phase 4 — Port panels to real data (retire old screens)
 - [ ] Phase 5 — Auth & config
 - [ ] Phase 6 — Provision & host
