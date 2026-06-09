@@ -9,10 +9,22 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 
 ---
 
-## ▶ RESUME HERE — Phase 4g (next session)
+## ▶ RESUME HERE — Phase 5 (next session)
 
 **Phase 4a–4f done** (build + typecheck green). All five tabs now render real
 data-backed panels; `panel-stub.tsx` deleted (no longer referenced).
+
+**4g CSV export is PARKED** — picked up in a later phase, not now. Notes for then:
+`src/lib/utils/csv.ts` is a **generic serializer** (`toCSV(headers, rows)`) with
+no TOIL/FLEX framing, so no rewrite is needed — just build rows from segment data
+and add an entry point (a `/export` command and/or button; none exists yet).
+
+**FLEX/TOIL framing — resolved (commit 0217d06):** plain **FLEX** everywhere, with
+ONE explanatory hint kept in the dashboard balances tooltip (`"flex / TOIL
+balance"`). Dropped the `flex day (TOIL)` label parenthetical; removed the dead
+pre-segment helpers (`calculateToilMinutes`/`calculateWorkedMinutes`/
+`calculateLunchDuration`) from `time-calculations.ts`. The model is FLEX-only
+(see `001_enums.sql`); don't reintroduce TOIL as a balance/type name.
 
 4a — shared TUI primitives + real edit modal:
 - `src/lib/tui/types.ts` — `TYPE_META` / `SEGMENT_TYPES` / `STATUS_TYPES` /
@@ -142,7 +154,9 @@ Progress:
   queries / actions / export routes **deleted**. **`next build` passes** — the
   branch is deployable again. (Edit-modal real editor + contextual arrows →
   Phase 4.)
-- [ ] Phase 4 — Port panels to real data (retire old screens)
+- [~] Phase 4 — Port panels to real data (retire old screens). **4a–4f done**
+  (all five tabs on real data, edit modal, contextual arrows, stubs deleted,
+  FLEX/TOIL framing resolved). **4g CSV export parked** for a later phase.
 - [ ] Phase 5 — Auth & config
 - [ ] Phase 6 — Provision & host
 - [ ] Phase 7 — Verify
