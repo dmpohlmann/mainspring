@@ -19,13 +19,13 @@ export function LeaveBalancesPanel({
   rows,
   standardDayHours,
   fyEndLabel,
-  fortnightsToFYEnd,
+  daysToFYEnd,
 }: {
   panelId: string;
   rows: BalanceRow[];
   standardDayHours: number;
   fyEndLabel: string;
-  fortnightsToFYEnd: number;
+  daysToFYEnd: number;
 }) {
   const { activePanel } = useShell();
   const num = "text-right tabular-nums";
@@ -57,9 +57,9 @@ export function LeaveBalancesPanel({
         ))}
       </div>
       <p className="mt-3 border-t border-dashed border-border pt-2 text-muted-foreground">
-        EOFY = projected balance at {fyEndLabel} ({fortnightsToFYEnd} fortnight
-        {fortnightsToFYEnd === 1 ? "" : "s"} of accrual left). FLEX accrues from
-        worked hours, not fortnightly.
+        EOFY = projected balance at {fyEndLabel} ({daysToFYEnd} day
+        {daysToFYEnd === 1 ? "" : "s"} of daily accrual left). FLEX accrues from
+        worked hours, not on a schedule.
       </p>
     </TerminalFrame>
   );

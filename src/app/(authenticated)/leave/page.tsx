@@ -11,7 +11,7 @@ import { appToday } from "@/lib/utils/today";
 import { LEAVE_TYPE_SEGMENT } from "@/lib/tui/types";
 import type { LeaveType } from "@/lib/types/database";
 
-const MS_PER_FORTNIGHT = 14 * 86400000;
+const MS_PER_DAY = 86400000;
 
 export default async function LeavePage() {
   const today = appToday();
@@ -30,11 +30,13 @@ export default async function LeavePage() {
   const fyEndYear = tm >= fyStartMonth ? ty + 1 : ty;
   const fyEnd = new Date(Date.UTC(fyEndYear, fyStartMonth - 1, 0));
   const fyEndStr = fyEnd.toISOString().slice(0, 10);
-  const fortnightsToFYEnd = Math.max(
+  // Days remaining this FY — accrual is daily, so project on days, not whole
+  // fortnights (the fortnightly floor under-counts near EOFY).
+  const daysToFYEnd = Math.max(
     0,
-    Math.floor(
+    Math.round(
       (Date.parse(fyEndStr + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) /
-        MS_PER_FORTNIGHT
+        MS_PER_DAY
     )
   );
   const fyEndLabel = fyEnd.toLocaleDateString("en-AU", {
@@ -53,7 +55,7 @@ export default async function LeavePage() {
       seg: LEAVE_TYPE_SEGMENT[lt],
       balanceH,
       accrualFn,
-      eofy: balanceH + accrualFn * fortnightsToFYEnd,
+      eofy: balanceH + (accrualFn / 14) * daysToFYEnd, // daily accrual
     };
   });
   rows.push({ seg: "flex_day", balanceH: flexMinutes / 60, accrualFn: null, eofy: null });
@@ -65,7 +67,7 @@ export default async function LeavePage() {
         rows={rows}
         standardDayHours={standardDayHours}
         fyEndLabel={fyEndLabel}
-        fortnightsToFYEnd={fortnightsToFYEnd}
+        daysToFYEnd={daysToFYEnd}
       />
       <LeaveTransactionsPanel panelId="transactions" transactions={transactions} />
       <LeaveAdjustPanel panelId="adjust" />
