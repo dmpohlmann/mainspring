@@ -200,7 +200,15 @@ export function AppShell({
         e.preventDefault();
         return setCmdOpen(true);
       }
-      if (e.key === "e" || e.key === "Enter") {
+      // `e` edits the selected day from anywhere (deliberate keypress).
+      if (e.key === "e") {
+        e.preventDefault();
+        return openEdit();
+      }
+      // Enter only edits when a week/calendar panel is active — otherwise plain
+      // Enter (e.g. activating a focused nav tab on a DSH↔TSH switch) would open
+      // the editor for a stale selected date.
+      if (e.key === "Enter" && weekDates) {
         e.preventDefault();
         return openEdit();
       }
