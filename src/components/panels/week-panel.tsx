@@ -8,13 +8,28 @@ import { Readout } from "@/components/tui/readout";
 import { useShell } from "@/components/shell/shell-context";
 import { fmtFlex, fmtHM, flexClass, dayDateLabel } from "@/lib/tui/format";
 import { getDayName, isWeekend } from "@/lib/utils/format";
-import type { DayEntry } from "@/lib/types/database";
+import type { DayEntry, TimesheetSegment } from "@/lib/types/database";
 
-// Lean per-day shape the panel actually renders (cached fields off the entry).
+// Lean per-day shape the panel actually renders (cached fields + segments for
+// the day summary).
 export type WeekDay = Pick<
   DayEntry,
-  "date" | "entry_type" | "flex_minutes" | "worked_minutes" | "status"
+  "date" | "entry_type" | "flex_minutes" | "worked_minutes" | "status" | "segments"
 >;
+
+// Compact start · lunch · end summary from a day's segments. Work bookends the
+// span; the break segment (if any) is the lunch. No split-day detail (no room).
+function daySummary(segments: TimesheetSegment[] | undefined) {
+  if (!segments?.length) return null;
+  const work = segments.filter((s) => s.type === "work");
+  const span = work.length ? work : segments;
+  const br = segments.find((s) => s.type === "break");
+  return {
+    start: span[0].start_time.slice(0, 5),
+    end: span[span.length - 1].end_time.slice(0, 5),
+    lunch: br ? `${br.start_time.slice(0, 5)}–${br.end_time.slice(0, 5)}` : null,
+  };
+}
 
 // A week of day rows + a weekly running-balance readout. Shared by the dashboard
 // "thisweek" panel and the two timesheet pay-week panels.
@@ -65,13 +80,14 @@ export function WeekPanel({
             const entry = byDate.get(date);
             const missing = !entry && !weekend && date < today;
             const f = entry?.flex_minutes ?? 0;
+            const summary = entry ? daySummary(entry.segments) : null;
             return (
               <button
                 type="button"
                 key={date}
                 disabled={weekend}
                 onClick={() => openEdit(date)}
-                className={`flex w-full items-center gap-3 px-2 py-1 text-left text-sm transition-colors ${
+                className={`flex w-full flex-col gap-0.5 px-2 py-1 text-left text-sm transition-colors ${
                   weekend
                     ? "cursor-default text-muted-foreground/50"
                     : "hover:bg-muted"
@@ -83,43 +99,60 @@ export function WeekPanel({
                       : ""
                 }`}
               >
-                <span className="w-[4ch] font-medium">{getDayName(date)}</span>
-                <span className="w-[8ch] text-muted-foreground">
-                  {dayDateLabel(date)}
+                <span className="flex w-full items-center gap-3">
+                  <span className="w-[4ch] font-medium">{getDayName(date)}</span>
+                  <span className="w-[8ch] text-muted-foreground">
+                    {dayDateLabel(date)}
+                  </span>
+                  <span className="flex flex-1 items-center gap-3">
+                    {entry ? (
+                      <>
+                        <TypeTag type={entry.entry_type} />
+                        <span className={flexClass(f)}>{fmtFlex(f)}</span>
+                        {entry.status && entry.status !== "approved" && (
+                          <span
+                            className="text-muted-foreground"
+                            title={`status: ${entry.status}`}
+                          >
+                            ({entry.status})
+                          </span>
+                        )}
+                      </>
+                    ) : missing ? (
+                      <Badge
+                        variant="outline"
+                        title="no entry logged"
+                        className="w-16 justify-center border-[var(--c-miss)] text-[var(--c-miss)]"
+                      >
+                        MISS
+                      </Badge>
+                    ) : (
+                      <span className="inline-block w-16 text-center text-muted-foreground/40">
+                        —
+                      </span>
+                    )}
+                  </span>
+                  {isToday ? (
+                    <span className="text-secondary">← today</span>
+                  ) : isSelected ? (
+                    <span className="text-secondary">▸ editing</span>
+                  ) : null}
                 </span>
-                <span className="flex flex-1 items-center gap-3">
-                  {entry ? (
-                    <>
-                      <TypeTag type={entry.entry_type} />
-                      <span className={flexClass(f)}>{fmtFlex(f)}</span>
-                      {entry.status && entry.status !== "approved" && (
-                        <span
-                          className="text-muted-foreground"
-                          title={`status: ${entry.status}`}
-                        >
-                          ({entry.status})
+                {summary && (
+                  <span className="flex w-full items-center gap-3 text-xs tabular-nums text-muted-foreground/70">
+                    <span className="w-[4ch]" />
+                    <span className="w-[8ch]" />
+                    <span>
+                      {summary.start}–{summary.end}
+                      {summary.lunch && (
+                        <span className="text-muted-foreground/50">
+                          {" "}
+                          · lunch {summary.lunch}
                         </span>
                       )}
-                    </>
-                  ) : missing ? (
-                    <Badge
-                      variant="outline"
-                      title="no entry logged"
-                      className="w-16 justify-center border-[var(--c-miss)] text-[var(--c-miss)]"
-                    >
-                      MISS
-                    </Badge>
-                  ) : (
-                    <span className="inline-block w-16 text-center text-muted-foreground/40">
-                      —
                     </span>
-                  )}
-                </span>
-                {isToday ? (
-                  <span className="text-secondary">← today</span>
-                ) : isSelected ? (
-                  <span className="text-secondary">▸ editing</span>
-                ) : null}
+                  </span>
+                )}
               </button>
             );
           })}
