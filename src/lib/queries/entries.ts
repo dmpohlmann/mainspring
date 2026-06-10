@@ -36,14 +36,27 @@ export async function getEntriesInRange(
   return (data ?? []).map((e) => withSortedSegments(e as unknown as DayEntry));
 }
 
-// Running FLEX balance = sum of every entry's cached flex_minutes.
+// Running FLEX balance = Σ every entry's cached flex_minutes + Σ manual flex
+// adjustments (leave_transactions of type 'flex', incl. the opening balance).
 export async function getFlexBalance(): Promise<number> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("timesheet_entries")
     .select("flex_minutes");
   if (error) throw error;
-  return (data ?? []).reduce((a, e) => a + (e.flex_minutes ?? 0), 0);
+  const fromEntries = (data ?? []).reduce((a, e) => a + (e.flex_minutes ?? 0), 0);
+
+  const { data: adj, error: adjErr } = await supabase
+    .from("leave_transactions")
+    .select("hours")
+    .eq("leave_type", "flex");
+  if (adjErr) throw adjErr;
+  const fromAdjustments = (adj ?? []).reduce(
+    (a, t) => a + Math.round(Number(t.hours) * 60),
+    0
+  );
+
+  return fromEntries + fromAdjustments;
 }
 
 export async function getPublicHolidays(

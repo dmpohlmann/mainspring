@@ -12,6 +12,7 @@ const TX_FILTERS = [
   { value: "all", code: "all", label: "all types" },
   { value: "annual", code: "REC", label: "recreation (annual) leave" },
   { value: "personal", code: "PRS", label: "personal leave" },
+  { value: "flex", code: "FLEX", label: "flex" },
 ];
 
 function hoursLabel(h: number) {

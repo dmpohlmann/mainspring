@@ -9,7 +9,11 @@ export type EntryType =
 // Segments additionally allow 'break' (unpaid lunch).
 export type SegmentType = "work" | "break" | EntryType;
 
+// Stored leave balances are annual/personal only. FLEX is derived, so it never
+// gets a leave_balances row — but it CAN appear in the transaction ledger as a
+// manual adjustment, hence the wider LedgerType.
 export type LeaveType = "annual" | "personal";
+export type LedgerType = LeaveType | "flex";
 
 export type LeaveStatus = "planned" | "pending" | "approved";
 
@@ -56,7 +60,7 @@ export interface LeaveBalance {
 export interface LeaveTransaction {
   id: string;
   user_id: string;
-  leave_type: LeaveType;
+  leave_type: LedgerType; // annual / personal / flex
   date: string;
   hours: number;
   description: string;
@@ -137,7 +141,7 @@ export interface Database {
     Enums: {
       entry_type: EntryType;
       segment_type: SegmentType;
-      leave_type: LeaveType;
+      leave_type: LedgerType;
       leave_status: LeaveStatus;
     };
     CompositeTypes: Record<string, never>;

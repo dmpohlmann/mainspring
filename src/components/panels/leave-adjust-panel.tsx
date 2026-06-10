@@ -10,17 +10,18 @@ import { Input } from "@/components/ui/input";
 import { useShell } from "@/components/shell/shell-context";
 import { typeCode, LEAVE_TYPE_SEGMENT } from "@/lib/tui/types";
 import { adjustLeaveBalance } from "@/lib/actions/leave";
-import type { LeaveType } from "@/lib/types/database";
+import type { LedgerType } from "@/lib/types/database";
 
 const TYPE_OPTIONS = [
   { value: "annual", code: "REC", label: "recreation (annual) leave" },
   { value: "personal", code: "PRS", label: "personal leave" },
+  { value: "flex", code: "FLEX", label: "flex (opening balance / correction)" },
 ];
 
 export function LeaveAdjustPanel({ panelId }: { panelId: string }) {
   const router = useRouter();
   const { activePanel } = useShell();
-  const [type, setType] = useState<LeaveType>("annual");
+  const [type, setType] = useState<LedgerType>("annual");
   const [hours, setHours] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -61,7 +62,7 @@ export function LeaveAdjustPanel({ panelId }: { panelId: string }) {
           <TokenSelect
             value={type}
             options={TYPE_OPTIONS}
-            onChange={(v) => setType(v as LeaveType)}
+            onChange={(v) => setType(v as LedgerType)}
           />
         </div>
         <div className="flex items-center gap-3">

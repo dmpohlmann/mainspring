@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { addDays } from "@/lib/utils/format";
-import type { LeaveType } from "@/lib/types/database";
+import type { LeaveType, LedgerType } from "@/lib/types/database";
 
 type DB = Awaited<ReturnType<typeof createClient>>;
 
@@ -19,33 +19,37 @@ function todayUTC() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Manual credit (+) / debit (−) with a reason. Updates balance + logs a tx.
+// Manual credit (+) / debit (−) with a reason. Logs a ledger transaction; for
+// annual/personal it also moves the stored balance. FLEX has no stored balance
+// (it's derived), so the transaction alone shifts the running flex total.
 export async function adjustLeaveBalance(
-  leaveType: LeaveType,
+  leaveType: LedgerType,
   hours: number,
   description: string
 ) {
   const supabase = await createClient();
   const userId = await requireUser(supabase);
 
-  const { data: bal } = await supabase
-    .from("leave_balances")
-    .select("id, balance_hours")
-    .eq("leave_type", leaveType)
-    .maybeSingle();
-
-  if (bal) {
-    await supabase
+  if (leaveType !== "flex") {
+    const { data: bal } = await supabase
       .from("leave_balances")
-      .update({ balance_hours: Number(bal.balance_hours) + hours })
-      .eq("id", bal.id);
-  } else {
-    await supabase.from("leave_balances").insert({
-      user_id: userId,
-      leave_type: leaveType,
-      balance_hours: hours,
-      accrual_rate_hours_per_fortnight: DEFAULT_RATE[leaveType],
-    });
+      .select("id, balance_hours")
+      .eq("leave_type", leaveType)
+      .maybeSingle();
+
+    if (bal) {
+      await supabase
+        .from("leave_balances")
+        .update({ balance_hours: Number(bal.balance_hours) + hours })
+        .eq("id", bal.id);
+    } else {
+      await supabase.from("leave_balances").insert({
+        user_id: userId,
+        leave_type: leaveType,
+        balance_hours: hours,
+        accrual_rate_hours_per_fortnight: DEFAULT_RATE[leaveType],
+      });
+    }
   }
 
   await supabase.from("leave_transactions").insert({

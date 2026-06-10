@@ -5,7 +5,7 @@
 // flex_day / public_holiday / break / other), NOT the prototype's short names.
 // Red is reserved for −flex and amber for MISS, so neither appears here.
 
-import type { LeaveType } from "@/lib/types/database";
+import type { LedgerType } from "@/lib/types/database";
 
 export type TokenOption = { value: string; code: string; label: string };
 
@@ -84,8 +84,10 @@ export const STATUS_TYPES: TokenOption[] = [
   { value: "approved", code: "approved", label: "approved" },
 ];
 
-// Leave-balance types (leave_type enum) → the matching segment type's metadata.
-export const LEAVE_TYPE_SEGMENT: Record<LeaveType, string> = {
+// Ledger types (leave_type enum) → the matching segment/entry type, for code +
+// colour. FLEX maps to flex_day (code FLEX) for display.
+export const LEAVE_TYPE_SEGMENT: Record<LedgerType, string> = {
   annual: "annual_leave",
   personal: "personal_leave",
+  flex: "flex_day",
 };
