@@ -19,10 +19,12 @@ import { timeToMinutes } from "@/lib/utils/time-calculations";
 export const STANDARD_DAY_MINUTES = 450;
 
 // Minutes that count toward fulfilling the standard day (besides worked time).
+// 'other' is paid non-work leave (study, disaster, etc.) — it fills the day too.
 const FILL_TYPES: SegmentType[] = [
   "annual_leave",
   "personal_leave",
   "public_holiday",
+  "other",
 ];
 
 type SegLike = Pick<TimesheetSegment, "type" | "start_time" | "end_time">;
