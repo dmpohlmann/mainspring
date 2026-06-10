@@ -1,5 +1,5 @@
 import { CalendarPanel } from "@/components/panels/calendar-panel";
-import { getEntriesInRange } from "@/lib/queries/entries";
+import { getEntriesInRange, getPublicHolidays } from "@/lib/queries/entries";
 import { getSettings } from "@/lib/queries/settings";
 import { appToday } from "@/lib/utils/today";
 import { calendarView, stepCursor } from "@/lib/tui/calendar";
@@ -21,7 +21,10 @@ export default async function CalendarPage({
     : DEFAULT_ANCHOR_DATE;
 
   const v = calendarView(view, cursor, anchor);
-  const entries = await getEntriesInRange(v.rangeStart, v.rangeEnd);
+  const [entries, holidays] = await Promise.all([
+    getEntriesInRange(v.rangeStart, v.rangeEnd),
+    getPublicHolidays(settings?.state ?? "QLD", v.rangeStart, v.rangeEnd),
+  ]);
 
   return (
     <CalendarPanel
@@ -35,6 +38,7 @@ export default async function CalendarPage({
       prevCursor={stepCursor(view, cursor, -1)}
       nextCursor={stepCursor(view, cursor, 1)}
       entries={entries}
+      holidays={holidays}
       today={today}
     />
   );

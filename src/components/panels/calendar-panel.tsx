@@ -40,6 +40,7 @@ export function CalendarPanel({
   prevCursor,
   nextCursor,
   entries,
+  holidays,
   today,
 }: {
   panelId: string;
@@ -52,6 +53,7 @@ export function CalendarPanel({
   prevCursor: string;
   nextCursor: string;
   entries: DayEntry[];
+  holidays: { date: string; name: string }[];
   today: string;
 }) {
   const router = useRouter();
@@ -59,6 +61,7 @@ export function CalendarPanel({
   const [filter, setFilter] = useState("all");
 
   const byDate = new Map(entries.map((e) => [e.date, e]));
+  const holidayByDate = new Map(holidays.map((h) => [h.date, h.name]));
   const matches = (e: DayEntry) => filter === "all" || e.entry_type === filter;
 
   const go = (v: string, c: string) =>
@@ -143,6 +146,11 @@ export function CalendarPanel({
             const isSelected = date === selectedDate && inRange;
             const entry = inRange ? byDate.get(date) : undefined;
             const showEntry = entry && matches(entry);
+            // Public holiday shown when there's no entry on that day and the
+            // filter allows it (all / PHOL).
+            const holiday = inRange ? holidayByDate.get(date) : undefined;
+            const showHoliday =
+              holiday && !showEntry && (filter === "all" || filter === "public_holiday");
             return (
               <button
                 key={date}
@@ -177,6 +185,14 @@ export function CalendarPanel({
                     {entry.status && entry.status !== "approved" && (
                       <span className="text-muted-foreground">*</span>
                     )}
+                  </span>
+                )}
+                {showHoliday && (
+                  <span
+                    className={`mt-auto ${typeColor("public_holiday")}`}
+                    title={holiday}
+                  >
+                    {typeCode("public_holiday")}
                   </span>
                 )}
               </button>
