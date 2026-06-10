@@ -9,43 +9,51 @@ authenticated routes now use the new TUI shell with stub panels awaiting data.
 
 ---
 
-## ▶ RESUME HERE — Phase 6 (next session)
+## ▶ RESUME HERE — Phase 7 (verify) + polish · APP IS LIVE 🎉
 
-**Phase 4a–4f + Phase 5 done** (build + typecheck green). All five tabs render
-real data-backed panels; `panel-stub.tsx` deleted.
+**Phases 1–6 DONE. The app is live and in real use** at
+**https://mainspringapp.vercel.app** (Vercel auto-deploys from `main`).
+Local branch is `main` (the old `terminal-aesthetic-reskin` was fast-forward
+merged into `main` and deleted — `main` IS the TUI app now). Build + tsc green.
 
-**Phase 5 — auth & config done:**
-- Renamed `src/middleware.ts` → `src/proxy.ts` (Next 16 `proxy` convention;
-  function `middleware`→`proxy`). `src/lib/supabase/middleware.ts` (Supabase's own
-  helper) kept as-is.
-- Deleted `src/app/preview/` and removed `/preview` from `publicPaths` in
-  `src/lib/supabase/middleware.ts`. `AUTHORISED_GITHUB_ID` gate already lives
-  there (checks `user_metadata.provider_id`/`sub`).
-- Reskinned `login` + `not-authorized` to the TUI (TerminalFrame); login shows
-  `?error` on failed callback. GitHub OAuth server action unchanged.
-- Added `.env.example` (NEXT_PUBLIC_SUPABASE_URL/ANON_KEY + AUTHORISED_GITHUB_ID).
-  `.env.local` still holds PLACEHOLDER creds so it builds locally — **Phase 6
-  swaps in the real project's creds.**
+**Live environment:**
+- Supabase project **`mainspring-mvp`** ref **`qqrvgkywuvexohrdinoz`**, Sydney
+  (ap-southeast-2), org `tinoqctdmxvggrjlxzfl` (free). URL
+  `https://qqrvgkywuvexohrdinoz.supabase.co`. Migrations **001–005** applied
+  (005 = add `flex` to `leave_type` enum; the search_path hardening is folded
+  into `004_triggers.sql`). 6 tables + RLS, advisor clean.
+- **Auth working**: GitHub OAuth enabled on the project; `AUTHORISED_GITHUB_ID=
+  13109700` gate (GitHub `dmpohlmann`, user `dmp@eml.cc`, uid `50fe2321-cd2f-
+  4c66-b83f-b876de75d95b`). `.env.local` (gitignored) has the real URL +
+  publishable key + the gate id. Old paused Mumbai project left untouched.
+- **Seeded**: public holidays **2023–2027** (national + QLD); settings row (7.5h
+  day, 20d/yr REC+PERS, FY July, QLD, pay anchor **2026-05-21** Thu); opening
+  balances REC 255h16m / PERS 340h01m / FLEX 44h15m; accrual 5.75 h/fn each;
+  **44 imported leave-history day-entries** (2024-03→2026-04; 17 REC, 6 PRS, 21
+  OTH study/disaster) — flex-neutral, balances preserved.
 
-**Phase 6 — DB provisioning DONE (via Supabase MCP); OAuth/Vercel/seed pending
-(need the user + live accounts):**
-- ✅ Project **`mainspring-mvp`** ref **`qqrvgkywuvexohrdinoz`**, region
-  **ap-southeast-2 (Sydney)**, org `tinoqctdmxvggrjlxzfl` (HalfBakedIdeas, free).
-  URL `https://qqrvgkywuvexohrdinoz.supabase.co`. Migrations 001–005 applied
-  (005 = search_path hardening); 6 tables + RLS; security advisor clean; gen'd
-  types match `database.ts`. `.env.local` has real URL + publishable key +
-  `AUTHORISED_GITHUB_ID=13109700` (GitHub `dmpohlmann`). Old paused Mumbai
-  `mainspring` (`cssyqitjoxcstcixlngm`) left untouched.
-- ⏳ **GitHub OAuth app** (user): callback = `https://qqrvgkywuvexohrdinoz.supabase.co/auth/v1/callback`.
-  Paste client id/secret into **Supabase dashboard → Auth → Providers → GitHub**
-  (no MCP tool for auth config). Add redirect URLs (localhost + prod) under
-  Auth → URL Configuration.
-- ⏳ **Vercel** (user): import repo, set the 3 env vars, deploy, merge
-  `terminal-aesthetic-reskin` → `main`.
-- ⏳ **Seed** settings + opening balances — only after first login (rows FK to
-  `auth.users`); use the settings form + leave-adjust, or run `initializeBalances`
-  via MCP `execute_sql` once the user's `auth.users` id exists.
-- Then **4g CSV export** (parked) + **Phase 7** E2E verify.
+**Post-launch changes already shipped (on top of Phase 1–6):**
+- `feat(leave)` FLEX adjustments via the ledger (migration 005) — opening flex /
+  corrections through Leave → adjust (FLEX option). `getFlexBalance` = Σ entry
+  flex + Σ flex ledger. `LedgerType = LeaveType | "flex"`.
+- `feat(week-panel)` per-day start·lunch·end summary line.
+- `fix(shell)` `Enter` only edits when a panel is active (`e` stays global) —
+  stops the editor popping on DSH↔TSH switches.
+- `fix(leave)` EOFY projection is **daily** (`balance + rate/14 × days-to-FY-end`).
+- `fix(calendar)` render public holidays on the grid (page fetches
+  `getPublicHolidays`).
+- `fix(calc)` `'other'` is a FILL type (study/disaster leave is flex-neutral).
+
+**Outstanding for next session (Phase 7 + polish):**
+1. **Phase 7 — E2E confidence sweep**: log a real split day, schedule leave with
+   a status, run `processAccruals`, eyeball calendar/holidays/leave history across
+   months. Core round-trip already proven live.
+2. **4g CSV export** (still parked) — see note below.
+3. **Optional git-history scrub**: `Leave History.csv` is untracked now but still
+   in history at commit `dedec23` (pushed). Offer force-push rewrite if wanted.
+4. **Minor**: confirm/adjust default lunch (60m); week panels still show `MISS`
+   for un-logged past weekdays that are public holidays (holidays not yet wired
+   into week-panel MISS / flex-fill — only the calendar shows holidays so far).
 
 **4g CSV export is PARKED** — picked up in a later phase, not now. Notes for then:
 `src/lib/utils/csv.ts` is a **generic serializer** (`toCSV(headers, rows)`) with
@@ -192,9 +200,13 @@ Progress:
   FLEX/TOIL framing resolved). **4g CSV export parked** for a later phase.
 - [x] **Phase 5 — Auth & config.** middleware→proxy (Next 16); `/preview`
   deleted + dropped from public paths; login/not-authorized reskinned to TUI;
-  `.env.example` added; `AUTHORISED_GITHUB_ID` gate in place. Real creds = Phase 6.
-- [ ] Phase 6 — Provision & host
-- [ ] Phase 7 — Verify
+  `.env.example` added; `AUTHORISED_GITHUB_ID` gate in place.
+- [x] **Phase 6 — Provision & host.** Supabase Sydney project (`mainspring-mvp`),
+  migrations applied, GitHub OAuth live, Vercel deploying from `main`, real data
+  seeded (holidays, settings, balances, accruals, pay anchor, leave history).
+  **App is live at mainspringapp.vercel.app.**
+- [~] Phase 7 — Verify (core round-trip proven live; full E2E sweep pending).
+  **4g CSV export still parked.**
 
 ---
 
